@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AURA PLUS — Scratch Game Lab</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
+
+
+<body>
+
+    <!-- =====================================================
+         AURA PLUS — INTRO
+    ====================================================== -->
+
+    <section
+        id="introScreen"
+        class="screen intro-screen"
+    >
+
+        <div class="intro-content">
+
+            <div class="intro-badge">
+                SCRATCH GAME LAB
+            </div>
+
+            <h1 class="aura-title">
+                AURA
+                <span>PLUS</span>
+            </h1>
+
+            <p class="aura-tagline">
+                YOU DON'T JUST PLAY THE GAME.
+                <strong>YOU BUILD IT.</strong>
+            </p>
+
+            <div class="intro-buttons">
+
+                <button
+                    id="playGameButton"
+                    class="primary-button"
+                >
+                    ▶ PLAY AURA PLUS
+                </button>
+
+                <button
+                    id="tutorialButton"
+                    class="secondary-button"
+                >
+                    🧩 BUILD THE GAME
+                </button>
+
+            </div>
+
+            <div class="scroll-hint">
+                TEACHER'S DAY EDITION
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         GAME SCREEN
+    ====================================================== -->
+
+    <section
+        id="gameScreen"
+        class="screen game-screen hidden"
+    >
+
+        <header class="game-header">
+
+            <div class="game-logo">
+                AURA <span>PLUS</span>
+            </div>
+
+            <div class="game-stats">
+
+                <div class="stat">
+                    <small>AURA</small>
+                    <strong id="auraScore">0</strong>
+                    <span>/ 100</span>
+                </div>
+
+                <div class="stat">
+                    <small>LIVES</small>
+                    <strong id="lives">❤️❤️❤️</strong>
+                </div>
+
+            </div>
+
+            <button
+                id="exitGame"
+                class="icon-button"
+            >
+                ✕
+            </button>
+
+        </header>
+
+
+        <div class="game-area">
+
+            <div
+                id="gameWorld"
+                class="game-world"
+            >
+
+                <div class="game-background"></div>
+
+
+                <!-- Aura player -->
+
+                <div
+                    id="player"
+                    class="game-sprite player"
+                >
+                    🧙
+                </div>
+
+
+                <!-- Aura orbs -->
+
+                <div
+                    class="game-sprite aura-orb orb-1"
+                    data-aura="10"
+                >
+                    ✦
+                </div>
+
+                <div
+                    class="game-sprite aura-orb orb-2"
+                    data-aura="10"
+                >
+                    ✦
+                </div>
+
+                <div
+                    class="game-sprite aura-orb orb-3"
+                    data-aura="10"
+                >
+                    ✦
+                </div>
+
+                <div
+                    class="game-sprite aura-orb orb-4"
+                    data-aura="10"
+                >
+                    ✦
+                </div>
+
+                <div
+                    class="game-sprite aura-orb orb-5"
+                    data-aura="10"
+                >
+                    ✦
+                </div>
+
+
+                <!-- Shadow -->
+
+                <div
+                    id="shadow"
+                    class="game-sprite shadow"
+                >
+                    👾
+                </div>
+
+
+                <!-- Portal -->
+
+                <div
+                    id="portal"
+                    class="portal locked"
+                >
+
+                    <div class="portal-ring">
+                        🌀
+                    </div>
+
+                    <span>
+                        LOCKED
+                    </span>
+
+                </div>
+
+
+                <!-- Game message -->
+
+                <div
+                    id="gameMessage"
+                    class="game-message"
+                ></div>
+
+            </div>
+
+        </div>
+
+
+        <div class="game-controls">
+
+            <div class="control-hint">
+                ⬅️ ➡️ ⬆️ ⬇️
+                <span>MOVE</span>
+            </div>
+
+            <div
+                id="gameObjective"
+                class="objective"
+            >
+                COLLECT 10 AURA ORBS
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         SECRET / HOOK SCREEN
+    ====================================================== -->
+
+    <section
+        id="secretScreen"
+        class="screen secret-screen hidden"
+    >
+
+        <div class="secret-content">
+
+            <div class="section-label">
+                THE SECRET
+            </div>
+
+            <h2>
+                HOW DID
+                <span>THIS</span>
+                HAPPEN?
+            </h2>
+
+            <p>
+                Every movement, costume, sound,
+                sprite and effect was created with
+                Scratch.
+            </p>
+
+            <button
+                id="revealButton"
+                class="primary-button"
+            >
+                REVEAL THE CODE →
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         TUTORIAL MAP
+    ====================================================== -->
+
+    <section
+        id="tutorialScreen"
+        class="screen tutorial-screen hidden"
+    >
+
+        <header class="tutorial-header">
+
+            <div>
+
+                <div class="section-label">
+                    AURA PLUS
+                </div>
+
+                <h2>
+                    BUILD THE GAME
+                </h2>
+
+            </div>
+
+            <div class="aura-progress">
+
+                <span>
+                    AURA
+                </span>
+
+                <div class="progress-track">
+
+                    <div
+                        id="auraProgress"
+                        class="progress-fill"
+                    ></div>
+
+                </div>
+
+                <strong id="tutorialAura">
+                    0%
+                </strong>
+
+            </div>
+
+        </header>
+
+
+        <div class="mission-map">
+
+            <!-- Mission 1 -->
+
+            <button
+                class="mission-card active"
+                data-mission="1"
+            >
+
+                <span class="mission-number">
+                    01
+                </span>
+
+                <span class="mission-icon">
+                    🧙
+                </span>
+
+                <strong>
+                    CREATE AURA
+                </strong>
+
+                <small>
+                    Add your player sprite
+                </small>
+
+            </button>
+
+
+            <!-- Mission 2 -->
+
+            <button
+                class="mission-card"
+                data-mission="2"
+            >
+
+                <span class="mission-number">
+                    02
+                </span>
+
+                <span class="mission-icon">
+                    🕹️
+                </span>
+
+                <strong>
+                    MAKE IT MOVE
+                </strong>
+
+                <small>
+                    Program movement
+                </small>
+
+            </button>
+
+
+            <!-- Mission 3 -->
+
+            <button
+                class="mission-card"
+                data-mission="3"
+            >
+
+                <span class="mission-number">
+                    03
+                </span>
+
+                <span class="mission-icon">
+                    💜
+                </span>
+
+                <strong>
+                    AURA ORBS
+                </strong>
+
+                <small>
+                    Collect multiple sprites
+                </small>
+
+            </button>
+
+
+            <!-- Mission 4 -->
+
+            <button
+                class="mission-card"
+                data-mission="4"
+            >
+
+                <span class="mission-number">
+                    04
+                </span>
+
+                <span class="mission-icon">
+                    👾
+                </span>
+
+                <strong>
+                    THE SHADOW
+                </strong>
+
+                <small>
+                    Program another sprite
+                </small>
+
+            </button>
+
+
+            <!-- Mission 5 -->
+
+            <button
+                class="mission-card"
+                data-mission="5"
+            >
+
+                <span class="mission-number">
+                    05
+                </span>
+
+                <span class="mission-icon">
+                    ❤️
+                </span>
+
+                <strong>
+                    LIVES
+                </strong>
+
+                <small>
+                    Add the challenge
+                </small>
+
+            </button>
+
+
+            <!-- Mission 6 -->
+
+            <button
+                class="mission-card"
+                data-mission="6"
+            >
+
+                <span class="mission-number">
+                    🌀
+                </span>
+
+                <span class="mission-icon">
+                    🌀
+                </span>
+
+                <strong>
+                    THE PORTAL
+                </strong>
+
+                <small>
+                    Create the goal
+                </small>
+
+            </button>
+
+
+            <!-- Mission 7 -->
+
+            <button
+                class="mission-card final-mission"
+                data-mission="7"
+            >
+
+                <span class="mission-number">
+                    07
+                </span>
+
+                <span class="mission-icon">
+                    ⚡
+                </span>
+
+                <strong>
+                    AURA PLUS
+                </strong>
+
+                <small>
+                    Unlock the final mode
+                </small>
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         LESSON / BLOCK REVEAL
+    ====================================================== -->
+
+    <section
+        id="lessonScreen"
+        class="screen lesson-screen hidden"
+    >
+
+        <header class="lesson-header">
+
+            <button
+                id="backToMissions"
+                class="back-button"
+            >
+                ← MISSIONS
+            </button>
+
+            <div class="lesson-title">
+
+                <span id="lessonNumber">
+                    MISSION 01
+                </span>
+
+                <h2 id="lessonTitle">
+                    CREATE AURA
+                </h2>
+
+            </div>
+
+            <div class="lesson-aura">
+                +10 AURA
+            </div>
+
+        </header>
+
+
+        <main class="lesson-layout">
+
+            <!-- Explanation -->
+
+            <div class="lesson-info">
+
+                <div class="section-label">
+                    MISSION BRIEF
+                </div>
+
+                <h3 id="lessonHeading">
+                    CREATE YOUR PLAYER
+                </h3>
+
+                <p id="lessonDescription">
+                    Every game needs a hero.
+                    In Scratch, the characters
+                    are called sprites.
+                </p>
+
+
+                <div class="concept-box">
+
+                    <span>
+                        🧠
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            SCRATCH CONCEPT
+                        </strong>
+
+                        <p id="lessonConcept">
+                            Adding and deleting sprites
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    id="showBlockButton"
+                    class="primary-button"
+                >
+                    SHOW THE BLOCK →
+                </button>
+
+            </div>
+
+
+            <!-- Block / Code area -->
+
+            <div class="lesson-code">
+
+                <div class="code-window">
+
+                    <div class="window-bar">
+
+                        <span></span>
+                        <span></span>
+                        <span></span>
+
+                        <label>
+                            SCRATCH CODE
+                        </label>
+
+                    </div>
+
+
+                    <div
+                        id="lessonBlocks"
+                        class="lesson-blocks"
+                    >
+
+                        <div class="scratch-block event-block">
+                            🟢 when green flag clicked
+                        </div>
+
+                        <div class="scratch-block motion-block">
+                            move 10 steps
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Guess the block -->
+
+                <div
+                    id="guessBox"
+                    class="guess-box"
+                >
+
+                    <div class="section-label">
+                        YOUR TURN
+                    </div>
+
+                    <h3>
+                        GUESS THE BLOCK
+                    </h3>
+
+                    <p>
+                        What should happen when
+                        the player presses the
+                        right arrow?
+                    </p>
+
+                    <div class="guess-options">
+
+                        <button data-answer="wrong">
+                            change y by 10
+                        </button>
+
+                        <button data-answer="correct">
+                            change x by 10
+                        </button>
+
+                        <button data-answer="wrong">
+                            change size by 10
+                        </button>
+
+                    </div>
+
+                    <div
+                        id="guessResult"
+                        class="guess-result"
+                    ></div>
+
+                </div>
+
+            </div>
+
+        </main>
+
+    </section>
+
+
+    <!-- =====================================================
+         CODE LAB
+    ====================================================== -->
+
+    <section
+        id="codeLabScreen"
+        class="screen code-lab-screen hidden"
+    >
+
+        <header class="lab-header">
+
+            <div>
+
+                <div class="section-label">
+                    AURA PLUS
+                </div>
+
+                <h2>
+                    CODE LAB
+                </h2>
+
+            </div>
+
+            <div class="lab-actions">
+
+                <button id="clearCode">
+                    🗑️ CLEAR
+                </button>
+
+                <button
+                    id="runCode"
+                    class="run-button"
+                >
+                    🟢 RUN
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <main class="code-lab">
+
+            <!-- Block categories -->
+
+            <aside class="block-library">
+
+                <h3>
+                    BLOCKS
+                </h3>
+
+                <button
+                    class="block-category active"
+                    data-category="motion"
+                >
+                    Motion
+                </button>
+
+                <button
+                    class="block-category"
+                    data-category="looks"
+                >
+                    Looks
+                </button>
+
+                <button
+                    class="block-category"
+                    data-category="sound"
+                >
+                    Sound
+                </button>
+
+                <button
+                    class="block-category"
+                    data-category="events"
+                >
+                    Events
+                </button>
+
+                <button
+                    class="block-category"
+                    data-category="control"
+                >
+                    Control
+                </button>
+
+                <div
+                    id="blockPalette"
+                    class="block-palette"
+                ></div>
+
+            </aside>
+
+
+            <!-- Workspace -->
+
+            <section class="workspace-section">
+
+                <div class="workspace-header">
+
+                    <h3>
+                        YOUR CODE
+                    </h3>
+
+                    <span>
+                        Drag blocks here
+                    </span>
+
+                </div>
+
+                <div
+                    id="workspace"
+                    class="workspace"
+                >
+
+                    <div
+                        class="scratch-block event-block"
+                        data-type="flag"
+                    >
+                        🟢 when green flag clicked
+                    </div>
+
+                    <div
+                        class="workspace-hint"
+                    >
+                        🧩 Drop your blocks here
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Live preview -->
+
+            <section class="preview-section">
+
+                <div class="preview-header">
+
+                    <h3>
+                        LIVE PREVIEW
+                    </h3>
+
+                </div>
+
+                <div
+                    id="previewStage"
+                    class="preview-stage"
+                >
+
+                    <div
+                        id="previewPlayer"
+                        class="preview-player"
+                    >
+                        🧙
+                    </div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </section>
+
+
+    <!-- =====================================================
+         FINAL SCREEN
+    ====================================================== -->
+
+    <section
+        id="finalScreen"
+        class="screen final-screen hidden"
+    >
+
+        <div class="final-content">
+
+            <div class="final-icon">
+                ⚡
+            </div>
+
+            <div class="section-label">
+                MISSION COMPLETE
+            </div>
+
+            <h1>
+                AURA
+                <span>PLUS</span>
+            </h1>
+
+            <p>
+                YOU DIDN'T JUST PLAY IT.
+                <br>
+                <strong>YOU BUILT IT.</strong>
+            </p>
+
+
+            <div class="concepts-completed">
+
+                <span>✓ SPRITES</span>
+                <span>✓ COSTUMES</span>
+                <span>✓ BACKDROPS</span>
+                <span>✓ SOUND</span>
+                <span>✓ PROGRAMMING</span>
+
+            </div>
+
+
+            <button
+                id="replayButton"
+                class="primary-button"
+            >
+                ↻ PLAY AGAIN
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         JAVASCRIPT
+    ====================================================== -->
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
