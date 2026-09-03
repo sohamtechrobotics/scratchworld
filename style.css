@@ -1360,3 +1360,24 @@ button {
         min-height: 145px;
     }
 }
+
+/* AURA PLUS interaction fixes */
+#gameWorld {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#gameWorld:focus {
+    outline: none;
+}
+
+#blockPalette,
+#lessonBlocks {
+    touch-action: none;
+}
+
+.drag-ghost {
+    pointer-events: none !important;
+    margin: 0 !important;
+}
