@@ -13,18 +13,15 @@ document.addEventListener("DOMContentLoaded", () => {
         final: document.getElementById("finalScreen")
     };
 
-    function showScreen(screen) {
-        Object.values(screens).forEach(s => {
-            if (s) {
-                s.classList.remove("active");
-                s.classList.add("hidden");
-            }
+    function showScreen(name) {
+        Object.entries(screens).forEach(([key, screen]) => {
+            if (!screen) return;
+
+            screen.classList.toggle("hidden", key !== name);
+            screen.classList.toggle("active", key === name);
         });
 
-        if (screens[screen]) {
-            screens[screen].classList.remove("hidden");
-            screens[screen].classList.add("active");
-        }
+        document.body.dataset.screen = name;
     }
 
 
@@ -35,6 +32,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("playGameButton")?.addEventListener("click", () => {
         startGame();
         showScreen("game");
+
+        // Important: make keyboard controls work immediately
+        gameWorld?.focus();
     });
 
     document.getElementById("tutorialButton")?.addEventListener("click", () => {
@@ -46,12 +46,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("exitGame")?.addEventListener("click", () => {
+        stopGame();
         showScreen("intro");
     });
 
 
     /* =========================================================
-       AURA PLUS GAME
+       GAME
     ========================================================= */
 
     const gameWorld = document.getElementById("gameWorld");
@@ -63,58 +64,175 @@ document.addEventListener("DOMContentLoaded", () => {
     const gameMessage = document.getElementById("gameMessage");
 
     let gameRunning = false;
+    let gameFrame = null;
+
     let score = 0;
     let lives = 3;
 
-    let playerX = 80;
-    let playerY = 120;
+    let playerX = 70;
+    let playerY = 100;
 
     let shadowX = 500;
-    let shadowY = 250;
+    let shadowY = 200;
 
-    let keys = {};
-    let gameAnimation;
+    const keys = {};
+
+    const orbPositions = [
+        ["18%", "25%"],
+        ["40%", "68%"],
+        ["68%", "25%"],
+        ["78%", "65%"],
+        ["48%", "45%"]
+    ];
 
 
     function startGame() {
 
         gameRunning = true;
+
         score = 0;
         lives = 3;
 
-        playerX = 80;
-        playerY = 120;
+        playerX = 70;
+        playerY = 100;
 
-        shadowX = Math.max(300, window.innerWidth - 500);
-        shadowY = 250;
+        shadowX = Math.max(300, gameWorld.clientWidth - 180);
+        shadowY = 180;
 
         auraScore.textContent = score;
         livesDisplay.textContent = lives;
 
+        if (gameMessage) {
+            gameMessage.classList.add("hidden");
+        }
+
         portal?.classList.remove("unlocked");
 
-        document.querySelectorAll(".aura-orb").forEach((orb, index) => {
+        const objective =
+            document.getElementById("gameObjective");
+
+        if (objective) {
+            objective.textContent =
+                "COLLECT THE AURA ORBS!";
+        }
+
+        document.querySelectorAll(".aura-orb").forEach((orb, i) => {
+
             orb.style.display = "block";
 
-            const positions = [
-                ["20%", "25%"],
-                ["45%", "70%"],
-                ["70%", "25%"],
-                ["78%", "65%"],
-                ["35%", "45%"]
-            ];
-
-            orb.style.left = positions[index][0];
-            orb.style.top = positions[index][1];
+            orb.style.left = orbPositions[i][0];
+            orb.style.top = orbPositions[i][1];
         });
 
         updatePlayer();
+        updateShadow();
 
-        if (gameAnimation) {
-            cancelAnimationFrame(gameAnimation);
-        }
+        cancelAnimationFrame(gameFrame);
 
         gameLoop();
+    }
+
+
+    function stopGame() {
+
+        gameRunning = false;
+
+        cancelAnimationFrame(gameFrame);
+
+        Object.keys(keys).forEach(key => {
+            keys[key] = false;
+        });
+    }
+
+
+    function gameLoop() {
+
+        if (!gameRunning) return;
+
+        movePlayer();
+        keepPlayerInside();
+
+        updatePlayer();
+        updateShadow();
+
+        collectOrbs();
+        checkShadowCollision();
+        checkPortal();
+
+        gameFrame =
+            requestAnimationFrame(gameLoop);
+    }
+
+
+    function movePlayer() {
+
+        const speed = 5;
+
+        // Arrow keys
+        if (keys.ArrowLeft) {
+            playerX -= speed;
+        }
+
+        if (keys.ArrowRight) {
+            playerX += speed;
+        }
+
+        if (keys.ArrowUp) {
+            playerY -= speed;
+        }
+
+        if (keys.ArrowDown) {
+            playerY += speed;
+        }
+
+        // WASD
+        if (keys.a) {
+            playerX -= speed;
+        }
+
+        if (keys.d) {
+            playerX += speed;
+        }
+
+        if (keys.w) {
+            playerY -= speed;
+        }
+
+        if (keys.s) {
+            playerY += speed;
+        }
+    }
+
+
+    function keepPlayerInside() {
+
+        if (!gameWorld || !player) return;
+
+        const maxX =
+            Math.max(
+                0,
+                gameWorld.clientWidth -
+                player.offsetWidth
+            );
+
+        const maxY =
+            Math.max(
+                0,
+                gameWorld.clientHeight -
+                player.offsetHeight
+            );
+
+        playerX =
+            Math.max(
+                0,
+                Math.min(maxX, playerX)
+            );
+
+        playerY =
+            Math.max(
+                0,
+                Math.min(maxY, playerY)
+            );
     }
 
 
@@ -122,8 +240,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!player) return;
 
-        player.style.left = `${playerX}px`;
-        player.style.top = `${playerY}px`;
+        player.style.left =
+            `${playerX}px`;
+
+        player.style.top =
+            `${playerY}px`;
     }
 
 
@@ -131,98 +252,128 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!shadow) return;
 
-        const dx = playerX - shadowX;
-        const dy = playerY - shadowY;
+        const dx =
+            playerX - shadowX;
 
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dy =
+            playerY - shadowY;
 
-        if (distance > 10) {
+        const distance =
+            Math.sqrt(dx * dx + dy * dy);
 
-            shadowX += (dx / distance) * 0.65;
-            shadowY += (dy / distance) * 0.65;
+        if (distance > 5) {
+
+            const shadowSpeed = 0.45;
+
+            shadowX +=
+                (dx / distance) *
+                shadowSpeed;
+
+            shadowY +=
+                (dy / distance) *
+                shadowSpeed;
         }
 
-        shadow.style.left = `${shadowX}px`;
-        shadow.style.top = `${shadowY}px`;
+        shadow.style.left =
+            `${shadowX}px`;
+
+        shadow.style.top =
+            `${shadowY}px`;
     }
 
 
-    function rectanglesTouch(a, b) {
+    function touching(element1, element2) {
 
-        if (!a || !b) return false;
+        if (!element1 || !element2) {
+            return false;
+        }
 
-        const ar = a.getBoundingClientRect();
-        const br = b.getBoundingClientRect();
+        const a =
+            element1.getBoundingClientRect();
+
+        const b =
+            element2.getBoundingClientRect();
 
         return !(
-            ar.right < br.left ||
-            ar.left > br.right ||
-            ar.bottom < br.top ||
-            ar.top > br.bottom
+            a.right < b.left ||
+            a.left > b.right ||
+            a.bottom < b.top ||
+            a.top > b.bottom
         );
     }
 
 
     function collectOrbs() {
 
-        document.querySelectorAll(".aura-orb").forEach(orb => {
+        document
+            .querySelectorAll(".aura-orb")
+            .forEach(orb => {
 
-            if (
-                orb.style.display !== "none" &&
-                rectanglesTouch(player, orb)
-            ) {
+                if (
+                    orb.style.display !== "none" &&
+                    touching(player, orb)
+                ) {
 
-                orb.style.display = "none";
+                    orb.style.display = "none";
 
-                score += Number(orb.dataset.value || 10);
+                    score +=
+                        Number(
+                            orb.dataset.value || 10
+                        );
 
-                auraScore.textContent = score;
+                    auraScore.textContent =
+                        score;
 
-                if (score >= 50) {
+                    if (score >= 50) {
 
-                    portal?.classList.add("unlocked");
+                        portal?.classList.add(
+                            "unlocked"
+                        );
 
-                    const objective =
-                        document.getElementById("gameObjective");
+                        const objective =
+                            document.getElementById(
+                                "gameObjective"
+                            );
 
-                    if (objective) {
-                        objective.textContent =
-                            "PORTAL UNLOCKED! REACH THE PORTAL!";
+                        if (objective) {
+                            objective.textContent =
+                                "⚡ PORTAL UNLOCKED — REACH IT!";
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
 
-    let lastHit = 0;
+    let lastHitTime = 0;
 
     function checkShadowCollision() {
 
-        if (!shadow || !player) return;
-
         if (
-            rectanglesTouch(player, shadow) &&
-            Date.now() - lastHit > 1500
+            !touching(player, shadow) ||
+            Date.now() - lastHitTime < 1500
         ) {
+            return;
+        }
 
-            lastHit = Date.now();
+        lastHitTime =
+            Date.now();
 
-            lives--;
+        lives--;
 
-            livesDisplay.textContent = lives;
+        livesDisplay.textContent =
+            lives;
 
-            playerX = 80;
-            playerY = 120;
+        playerX = 70;
+        playerY = 100;
 
-            if (lives <= 0) {
+        if (lives <= 0) {
 
-                gameRunning = false;
+            stopGame();
 
-                showGameMessage(
-                    "GAME OVER 😵<br><small>Press PLAY AURA PLUS again.</small>"
-                );
-            }
+            showGameMessage(
+                "GAME OVER 😵<br><small>Click EXIT and play again.</small>"
+            );
         }
     }
 
@@ -231,132 +382,139 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (
             score >= 50 &&
-            portal &&
-            rectanglesTouch(player, portal)
+            touching(player, portal)
         ) {
 
-            gameRunning = false;
+            stopGame();
 
             showScreen("secret");
         }
     }
 
 
-    function gameLoop() {
-
-        if (!gameRunning) return;
-
-        const speed = 4;
-
-        if (keys["ArrowLeft"] || keys["a"]) {
-            playerX -= speed;
-        }
-
-        if (keys["ArrowRight"] || keys["d"]) {
-            playerX += speed;
-        }
-
-        if (keys["ArrowUp"] || keys["w"]) {
-            playerY -= speed;
-        }
-
-        if (keys["ArrowDown"] || keys["s"]) {
-            playerY += speed;
-        }
-
-        const maxX = gameWorld.clientWidth - 65;
-        const maxY = gameWorld.clientHeight - 65;
-
-        playerX = Math.max(5, Math.min(maxX, playerX));
-        playerY = Math.max(5, Math.min(maxY, playerY));
-
-        updatePlayer();
-        updateShadow();
-        collectOrbs();
-        checkShadowCollision();
-        checkPortal();
-
-        gameAnimation = requestAnimationFrame(gameLoop);
-    }
-
-
-    window.addEventListener("keydown", e => {
-
-        keys[e.key] = true;
-
-        if (
-            [
-                "ArrowUp",
-                "ArrowDown",
-                "ArrowLeft",
-                "ArrowRight"
-            ].includes(e.key)
-        ) {
-            e.preventDefault();
-        }
-    });
-
-
-    window.addEventListener("keyup", e => {
-        keys[e.key] = false;
-    });
-
-
     function showGameMessage(message) {
 
         if (!gameMessage) return;
 
-        gameMessage.innerHTML = message;
-        gameMessage.classList.remove("hidden");
+        gameMessage.innerHTML =
+            message;
 
-        setTimeout(() => {
-            gameMessage.classList.add("hidden");
-        }, 3000);
+        gameMessage.classList.remove(
+            "hidden"
+        );
     }
 
 
     /* =========================================================
-       TOUCH / SMARTBOARD PLAYER CONTROL
+       KEYBOARD — FIXED
     ========================================================= */
 
-    let draggingPlayer = false;
+    window.addEventListener("keydown", event => {
 
-    player?.addEventListener("pointerdown", e => {
+        const gameActive =
+            !screens.game?.classList.contains("hidden");
 
-        draggingPlayer = true;
+        if (!gameActive) return;
 
-        player.setPointerCapture?.(e.pointerId);
+        const allowedKeys = [
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "w",
+            "a",
+            "s",
+            "d",
+            "W",
+            "A",
+            "S",
+            "D"
+        ];
+
+        if (allowedKeys.includes(event.key)) {
+
+            event.preventDefault();
+
+            if (
+                event.key === "W" ||
+                event.key === "A" ||
+                event.key === "S" ||
+                event.key === "D"
+            ) {
+                keys[event.key.toLowerCase()] = true;
+            } else {
+                keys[event.key] = true;
+            }
+        }
     });
 
-    gameWorld?.addEventListener("pointermove", e => {
 
-        if (!draggingPlayer) return;
+    window.addEventListener("keyup", event => {
 
-        const rect = gameWorld.getBoundingClientRect();
+        keys[event.key] = false;
 
-        playerX = e.clientX - rect.left - player.offsetWidth / 2;
-        playerY = e.clientY - rect.top - player.offsetHeight / 2;
-
-        playerX = Math.max(0, Math.min(
-            gameWorld.clientWidth - player.offsetWidth,
-            playerX
-        ));
-
-        playerY = Math.max(0, Math.min(
-            gameWorld.clientHeight - player.offsetHeight,
-            playerY
-        ));
-
-        updatePlayer();
-    });
-
-    window.addEventListener("pointerup", () => {
-        draggingPlayer = false;
+        if (
+            ["W", "A", "S", "D"].includes(event.key)
+        ) {
+            keys[event.key.toLowerCase()] = false;
+        }
     });
 
 
     /* =========================================================
-       SCRATCH LESSON DATA
+       GAME TOUCH CONTROL
+    ========================================================= */
+
+    let playerPointerActive = false;
+
+    player?.addEventListener(
+        "pointerdown",
+        event => {
+
+            event.preventDefault();
+
+            playerPointerActive = true;
+
+            player.setPointerCapture?.(
+                event.pointerId
+            );
+        }
+    );
+
+    gameWorld?.addEventListener(
+        "pointermove",
+        event => {
+
+            if (!playerPointerActive) return;
+
+            const rect =
+                gameWorld.getBoundingClientRect();
+
+            playerX =
+                event.clientX -
+                rect.left -
+                player.offsetWidth / 2;
+
+            playerY =
+                event.clientY -
+                rect.top -
+                player.offsetHeight / 2;
+
+            keepPlayerInside();
+            updatePlayer();
+        }
+    );
+
+    window.addEventListener(
+        "pointerup",
+        () => {
+            playerPointerActive = false;
+        }
+    );
+
+
+    /* =========================================================
+       LESSON DATA
     ========================================================= */
 
     const lessons = {
@@ -366,9 +524,9 @@ document.addEventListener("DOMContentLoaded", () => {
             description:
                 "Sprites are the characters and objects that we program in Scratch.",
             points: [
-                "Add a new sprite from the Sprite pane.",
-                "Select a sprite to program it.",
-                "Delete a sprite when you don't need it.",
+                "Add a new sprite.",
+                "Select a sprite.",
+                "Delete a sprite.",
                 "Each sprite can have its own scripts."
             ],
             tip:
@@ -377,8 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
             blocks: [
                 {
                     text: "when green flag clicked",
-                    category: "events",
-                    action: "event"
+                    category: "events"
                 }
             ]
         },
@@ -386,36 +543,24 @@ document.addEventListener("DOMContentLoaded", () => {
         2: {
             title: "Make a Sprite Move",
             description:
-                "Use Motion blocks to control where your sprite moves.",
+                "Motion blocks control the movement of a sprite.",
             points: [
                 "Motion blocks are blue.",
-                "move 10 steps moves the sprite forward.",
+                "move 10 steps moves the sprite.",
                 "change x by 10 moves horizontally.",
                 "change y by 10 moves vertically."
             ],
             tip:
-                "Blue Motion blocks control the movement of a sprite.",
+                "Blue Motion blocks control sprite movement.",
             category: "motion",
             blocks: [
                 {
                     text: "move 10 steps",
-                    category: "motion",
-                    action: "move"
-                },
-                {
-                    text: "turn ↻ 15 degrees",
-                    category: "motion",
-                    action: "turn"
+                    category: "motion"
                 },
                 {
                     text: "change x by 10",
-                    category: "motion",
-                    action: "x"
-                },
-                {
-                    text: "change y by 10",
-                    category: "motion",
-                    action: "y"
+                    category: "motion"
                 }
             ]
         },
@@ -423,12 +568,12 @@ document.addEventListener("DOMContentLoaded", () => {
         3: {
             title: "Change Costumes",
             description:
-                "A sprite can have more than one costume. Switching costumes can create animation.",
+                "A sprite can have different costumes.",
             points: [
                 "Open the Costumes tab.",
                 "Add another costume.",
-                "Use next costume to switch costumes.",
-                "Costumes change how a sprite looks."
+                "Use next costume.",
+                "Costumes change the appearance of a sprite."
             ],
             tip:
                 "Costumes are different appearances of the same sprite.",
@@ -436,13 +581,11 @@ document.addEventListener("DOMContentLoaded", () => {
             blocks: [
                 {
                     text: "next costume",
-                    category: "looks",
-                    action: "costume"
+                    category: "looks"
                 },
                 {
                     text: "switch costume to [costume2]",
-                    category: "looks",
-                    action: "costume"
+                    category: "looks"
                 }
             ]
         },
@@ -450,26 +593,24 @@ document.addEventListener("DOMContentLoaded", () => {
         4: {
             title: "Program Two Sprites",
             description:
-                "Scratch lets us program different sprites independently.",
+                "Different sprites can have different scripts.",
             points: [
                 "Add another sprite.",
-                "Select the sprite you want to program.",
-                "Each sprite has its own scripts.",
-                "Both sprites can respond to the green flag."
+                "Select the sprite.",
+                "Create its own script.",
+                "Both sprites can react to the green flag."
             ],
             tip:
-                "One Scratch project can contain many independently programmed sprites.",
+                "Every sprite can have its own scripts.",
             category: "events",
             blocks: [
                 {
                     text: "when green flag clicked",
-                    category: "events",
-                    action: "event"
+                    category: "events"
                 },
                 {
                     text: "say [Hello!] for 2 seconds",
-                    category: "looks",
-                    action: "say"
+                    category: "looks"
                 }
             ]
         },
@@ -480,23 +621,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 "The Stage uses backdrops as its background.",
             points: [
                 "Click the Stage.",
-                "Open the Backdrops tab.",
-                "Choose or add a backdrop.",
-                "A backdrop belongs to the Stage, not a sprite."
+                "Open Backdrops.",
+                "Choose a backdrop.",
+                "Backdrops belong to the Stage."
             ],
             tip:
-                "Sprite = character or object. Backdrop = Stage background.",
+                "Sprite = character/object. Backdrop = Stage background.",
             category: "looks",
             blocks: [
                 {
                     text: "switch backdrop to [backdrop1]",
-                    category: "looks",
-                    action: "backdrop"
+                    category: "looks"
                 },
                 {
                     text: "next backdrop",
-                    category: "looks",
-                    action: "backdrop"
+                    category: "looks"
                 }
             ]
         },
@@ -504,26 +643,24 @@ document.addEventListener("DOMContentLoaded", () => {
         6: {
             title: "Working with Sounds",
             description:
-                "Sounds can make your Scratch projects more interactive.",
+                "Sounds make Scratch projects interactive.",
             points: [
                 "Open the Sounds tab.",
                 "Choose or add a sound.",
-                "Use start sound to play it.",
+                "Use a Sound block.",
                 "Sound blocks are pink."
             ],
             tip:
-                "The Sounds tab lets you add and edit sounds for a sprite.",
+                "Sounds can be added to sprites and played by scripts.",
             category: "sound",
             blocks: [
                 {
                     text: "start sound [Meow]",
-                    category: "sound",
-                    action: "sound"
+                    category: "sound"
                 },
                 {
                     text: "play sound [Meow] until done",
-                    category: "sound",
-                    action: "sound"
+                    category: "sound"
                 }
             ]
         },
@@ -531,46 +668,37 @@ document.addEventListener("DOMContentLoaded", () => {
         7: {
             title: "Build a Mini Game",
             description:
-                "Now combine your Scratch skills to create a simple interactive game.",
+                "Combine your Scratch skills to build an interactive project.",
             points: [
-                "Start the project with the green flag.",
+                "Start with the green flag.",
                 "Move your sprite.",
-                "Use another sprite as an obstacle.",
-                "Use costumes, sounds and backdrops.",
-                "Test your project and improve it."
+                "Use another sprite.",
+                "Use costumes and sounds.",
+                "Test your project."
             ],
             tip:
-                "Good Scratch projects are built by combining small scripts.",
+                "Scratch projects are made by combining small scripts.",
             category: "events",
             blocks: [
                 {
                     text: "when green flag clicked",
-                    category: "events",
-                    action: "event"
+                    category: "events"
                 },
                 {
                     text: "forever",
-                    category: "control",
-                    action: "forever"
+                    category: "control"
                 },
                 {
                     text: "move 10 steps",
-                    category: "motion",
-                    action: "move"
-                },
-                {
-                    text: "next costume",
-                    category: "looks",
-                    action: "costume"
+                    category: "motion"
                 }
             ]
         }
-
     };
 
 
     /* =========================================================
-       SCRATCH PALETTE
+       PALETTE
     ========================================================= */
 
     const paletteBlocks = {
@@ -654,10 +782,16 @@ document.addEventListener("DOMContentLoaded", () => {
        LESSON ELEMENTS
     ========================================================= */
 
-    const lessonTitle = document.getElementById("lessonTitle");
-    const lessonDescription = document.getElementById("lessonDescription");
+    const lessonTitle =
+        document.getElementById("lessonTitle");
+
+    const lessonDescription =
+        document.getElementById("lessonDescription");
+
     const lessonLearningPoints =
-        document.getElementById("lessonLearningPoints");
+        document.getElementById(
+            "lessonLearningPoints"
+        );
 
     const teacherTip =
         document.getElementById("teacherTip");
@@ -678,31 +812,35 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("lessonBlocks");
 
     const workspaceInstruction =
-        document.getElementById("workspaceInstruction");
+        document.getElementById(
+            "workspaceInstruction"
+        );
 
     const blockCount =
         document.getElementById("blockCount");
 
     let currentMission = 1;
     let currentStep = 0;
-    let completedMissions = new Set();
 
-    let draggedBlock = null;
+    const completedMissions =
+        new Set();
 
 
     /* =========================================================
-       MISSION MAP
+       MISSION BUTTONS
     ========================================================= */
 
-    document.querySelectorAll(".mission-card").forEach(card => {
+    document
+        .querySelectorAll(".mission-card")
+        .forEach(card => {
 
-        card.addEventListener("click", () => {
+            card.addEventListener("click", () => {
 
-            const mission = Number(card.dataset.mission);
-
-            openLesson(mission);
+                openLesson(
+                    Number(card.dataset.mission)
+                );
+            });
         });
-    });
 
 
     function openLesson(mission) {
@@ -716,24 +854,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+    /* =========================================================
+       RENDER LESSON
+    ========================================================= */
+
     function renderLesson() {
 
-        const lesson = lessons[currentMission];
+        const lesson =
+            lessons[currentMission];
 
         if (!lesson) return;
 
-        lessonTitle.textContent = lesson.title;
-        lessonDescription.textContent = lesson.description;
-        teacherTip.textContent = lesson.tip;
+        lessonTitle.textContent =
+            lesson.title;
 
-        lessonNumber.textContent = currentMission;
-        lessonStep.textContent = currentStep + 1;
+        lessonDescription.textContent =
+            lesson.description;
+
+        teacherTip.textContent =
+            lesson.tip;
+
+        lessonNumber.textContent =
+            currentMission;
 
         lessonLearningPoints.innerHTML = "";
 
         lesson.points.forEach(point => {
 
-            const li = document.createElement("li");
+            const li =
+                document.createElement("li");
 
             li.textContent = point;
 
@@ -742,24 +891,89 @@ document.addEventListener("DOMContentLoaded", () => {
 
         lessonBlocks.innerHTML = "";
 
+        blockCount.textContent =
+            "0 blocks";
+
+        lessonStep.textContent = "1";
+
         workspaceInstruction.textContent =
-            "Choose a Scratch block from the palette and drag it here.";
+            `👉 Find and drag: ${lesson.blocks[0].text}`;
 
-        blockCount.textContent = "0 blocks";
-
-        renderPalette(lesson.category);
+        renderPalette(
+            lesson.blocks[0].category
+        );
 
         updateProgress();
     }
 
 
     /* =========================================================
-       PALETTE RENDERING
+       SCRATCH BLOCK CREATION
     ========================================================= */
 
-    function renderPalette(category) {
+    function createScratchBlock(
+        text,
+        category,
+        workspace = false
+    ) {
 
-        if (!blockPalette) return;
+        const block =
+            document.createElement("div");
+
+        block.className =
+            `scratch-block ${category}`;
+
+        block.textContent =
+            text;
+
+        block.dataset.text =
+            text;
+
+        block.dataset.category =
+            category;
+
+        if (!workspace) {
+
+            block.draggable = true;
+
+            block.addEventListener(
+                "dragstart",
+                event => {
+
+                    event.dataTransfer.effectAllowed =
+                        "copy";
+
+                    event.dataTransfer.setData(
+                        "text/plain",
+                        JSON.stringify({
+                            text,
+                            category
+                        })
+                    );
+
+                    block.classList.add(
+                        "dragging"
+                    );
+                }
+            );
+
+            block.addEventListener(
+                "dragend",
+                () => {
+                    block.classList.remove(
+                        "dragging"
+                    );
+                }
+            );
+
+            setupTouchDrag(block);
+        }
+
+        return block;
+    }
+
+
+    function renderPalette(category) {
 
         blockPalette.innerHTML = "";
 
@@ -772,68 +986,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         blocks.forEach(text => {
 
-            const block =
+            blockPalette.appendChild(
                 createScratchBlock(
                     text,
-                    category,
-                    false
-                );
-
-            blockPalette.appendChild(block);
+                    category
+                )
+            );
         });
-    }
 
-
-    function createScratchBlock(
-        text,
-        category,
-        workspaceBlock = false
-    ) {
-
-        const block =
-            document.createElement("div");
-
-        block.className =
-            `scratch-block ${category}`;
-
-        block.textContent = text;
-
-        block.dataset.text = text;
-        block.dataset.category = category;
-
-        if (!workspaceBlock) {
-
-            block.setAttribute(
-                "draggable",
-                "true"
-            );
-
-            block.addEventListener(
-                "dragstart",
-                e => {
-
-                    draggedBlock = {
-                        text,
-                        category
-                    };
-
-                    e.dataTransfer.setData(
-                        "text/plain",
-                        JSON.stringify({
-                            text,
-                            category
-                        })
-                    );
-                }
-            );
-
-            block.addEventListener(
-                "pointerdown",
-                startTouchDrag
-            );
-        }
-
-        return block;
+        highlightExpectedBlock();
     }
 
 
@@ -841,101 +1002,240 @@ document.addEventListener("DOMContentLoaded", () => {
        DESKTOP DROP
     ========================================================= */
 
-    lessonBlocks?.addEventListener(
-        "dragover",
-        e => {
-            e.preventDefault();
+    lessonBlocks.addEventListener(
+        "dragenter",
+        event => {
+
+            event.preventDefault();
+
+            lessonBlocks.style.background =
+                "rgba(76,151,255,0.10)";
         }
     );
 
-    lessonBlocks?.addEventListener(
+    lessonBlocks.addEventListener(
+        "dragover",
+        event => {
+
+            event.preventDefault();
+
+            event.dataTransfer.dropEffect =
+                "copy";
+        }
+    );
+
+    lessonBlocks.addEventListener(
+        "dragleave",
+        event => {
+
+            if (
+                event.target === lessonBlocks
+            ) {
+                lessonBlocks.style.background =
+                    "";
+            }
+        }
+    );
+
+    lessonBlocks.addEventListener(
         "drop",
-        e => {
+        event => {
 
-            e.preventDefault();
+            event.preventDefault();
 
-            if (!draggedBlock) return;
+            lessonBlocks.style.background =
+                "";
 
-            addBlockToWorkspace(
-                draggedBlock.text,
-                draggedBlock.category
-            );
+            const raw =
+                event.dataTransfer.getData(
+                    "text/plain"
+                );
 
-            draggedBlock = null;
+            if (!raw) return;
+
+            try {
+
+                const data =
+                    JSON.parse(raw);
+
+                addBlockToWorkspace(
+                    data.text,
+                    data.category
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "Block drop error:",
+                    error
+                );
+            }
         }
     );
 
 
     /* =========================================================
-       TOUCH / SMARTBOARD BLOCK DRAG
+       TOUCH DRAG — SMARTBOARD
     ========================================================= */
 
-    let touchClone = null;
+    let touchDragging = false;
+    let touchBlock = null;
     let touchData = null;
+    let touchPointerId = null;
 
-    function startTouchDrag(e) {
+    function setupTouchDrag(block) {
 
-        touchData = {
-            text: e.currentTarget.dataset.text,
-            category: e.currentTarget.dataset.category
-        };
+        block.addEventListener(
+            "pointerdown",
+            event => {
 
-        touchClone =
-            e.currentTarget.cloneNode(true);
+                if (
+                    event.pointerType === "mouse" &&
+                    event.button !== 0
+                ) {
+                    return;
+                }
 
-        touchClone.style.position = "fixed";
-        touchClone.style.zIndex = "9999";
-        touchClone.style.pointerEvents = "none";
-        touchClone.style.width =
-            `${e.currentTarget.offsetWidth}px`;
+                event.preventDefault();
 
-        document.body.appendChild(touchClone);
+                touchDragging = true;
 
-        moveTouchClone(e);
+                touchPointerId =
+                    event.pointerId;
 
-        e.currentTarget.setPointerCapture?.(
-            e.pointerId
+                touchData = {
+                    text: block.dataset.text,
+                    category: block.dataset.category
+                };
+
+                touchBlock =
+                    block.cloneNode(true);
+
+                touchBlock.style.position =
+                    "fixed";
+
+                touchBlock.style.zIndex =
+                    "99999";
+
+                touchBlock.style.pointerEvents =
+                    "none";
+
+                touchBlock.style.width =
+                    `${block.getBoundingClientRect().width}px`;
+
+                touchBlock.style.opacity =
+                    "0.92";
+
+                touchBlock.style.margin =
+                    "0";
+
+                document.body.appendChild(
+                    touchBlock
+                );
+
+                moveTouchBlock(event);
+
+                block.setPointerCapture?.(
+                    event.pointerId
+                );
+            }
         );
 
-        e.currentTarget.addEventListener(
+        block.addEventListener(
             "pointermove",
-            moveTouchClone
+            event => {
+
+                if (
+                    !touchDragging ||
+                    event.pointerId !==
+                    touchPointerId
+                ) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                moveTouchBlock(event);
+
+                highlightDropArea(
+                    event.clientX,
+                    event.clientY
+                );
+            }
         );
 
-        e.currentTarget.addEventListener(
+        block.addEventListener(
             "pointerup",
-            endTouchDrag,
-            { once: true }
+            event => {
+
+                if (
+                    !touchDragging ||
+                    event.pointerId !==
+                    touchPointerId
+                ) {
+                    return;
+                }
+
+                finishTouchDrag(event);
+            }
+        );
+
+        block.addEventListener(
+            "pointercancel",
+            () => {
+                cancelTouchDrag();
+            }
         );
     }
 
 
-    function moveTouchClone(e) {
+    function moveTouchBlock(event) {
 
-        if (!touchClone) return;
+        if (!touchBlock) return;
 
-        touchClone.style.left =
-            `${e.clientX - 20}px`;
+        touchBlock.style.left =
+            `${event.clientX - 25}px`;
 
-        touchClone.style.top =
-            `${e.clientY - 20}px`;
+        touchBlock.style.top =
+            `${event.clientY - 20}px`;
     }
 
 
-    function endTouchDrag(e) {
+    function highlightDropArea(x, y) {
 
-        if (!touchClone || !touchData) return;
-
-        const workspaceRect =
+        const rect =
             lessonBlocks.getBoundingClientRect();
 
         const inside =
-            e.clientX >= workspaceRect.left &&
-            e.clientX <= workspaceRect.right &&
-            e.clientY >= workspaceRect.top &&
-            e.clientY <= workspaceRect.bottom;
+            x >= rect.left &&
+            x <= rect.right &&
+            y >= rect.top &&
+            y <= rect.bottom;
 
-        if (inside) {
+        lessonBlocks.style.outline =
+            inside
+                ? "4px solid #4c97ff"
+                : "";
+
+        lessonBlocks.style.outlineOffset =
+            inside
+                ? "-4px"
+                : "";
+    }
+
+
+    function finishTouchDrag(event) {
+
+        const rect =
+            lessonBlocks.getBoundingClientRect();
+
+        const inside =
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom;
+
+        if (inside && touchData) {
 
             addBlockToWorkspace(
                 touchData.text,
@@ -943,70 +1243,76 @@ document.addEventListener("DOMContentLoaded", () => {
             );
         }
 
-        touchClone.remove();
+        cancelTouchDrag();
+    }
 
-        touchClone = null;
+
+    function cancelTouchDrag() {
+
+        if (touchBlock) {
+            touchBlock.remove();
+        }
+
+        touchBlock = null;
         touchData = null;
+        touchDragging = false;
+        touchPointerId = null;
+
+        lessonBlocks.style.outline = "";
+        lessonBlocks.style.outlineOffset = "";
     }
 
 
     /* =========================================================
-       ADD BLOCK TO WORKSPACE
+       ADD BLOCK
     ========================================================= */
 
-    function addBlockToWorkspace(text, category) {
+    function addBlockToWorkspace(
+        text,
+        category
+    ) {
 
-        const block =
-            createScratchBlock(
-                text,
-                category,
-                true
-            );
-
-        block.classList.add("workspace-block");
-
-        lessonBlocks.appendChild(block);
-
-        blockCount.textContent =
-            `${lessonBlocks.children.length} blocks`;
-
-        checkLessonProgress(text);
-    }
-
-
-    /* =========================================================
-       LESSON PROGRESS
-    ========================================================= */
-
-    function checkLessonProgress(text) {
-
-        const lesson = lessons[currentMission];
-
-        if (!lesson) return;
+        const lesson =
+            lessons[currentMission];
 
         const expected =
             lesson.blocks[currentStep];
 
-        if (!expected) return;
-
+        // Correct block
         if (
-            normalizeBlock(text) ===
-            normalizeBlock(expected.text)
+            expected &&
+            normalize(text) ===
+            normalize(expected.text)
         ) {
 
-            showWorkspaceSuccess(
-                "✅ Correct! That's the Scratch block we need."
+            const block =
+                createScratchBlock(
+                    text,
+                    category,
+                    true
+                );
+
+            block.classList.add(
+                "workspace-block"
             );
+
+            lessonBlocks.appendChild(
+                block
+            );
+
+            blockCount.textContent =
+                `${lessonBlocks.children.length} blocks`;
 
             currentStep++;
 
-            lessonStep.textContent =
-                Math.min(
-                    currentStep + 1,
-                    lesson.blocks.length
-                );
+            showSuccess(
+                "✅ Correct! Great job."
+            );
 
-            if (currentStep >= lesson.blocks.length) {
+            if (
+                currentStep >=
+                lesson.blocks.length
+            ) {
 
                 completeMission();
 
@@ -1015,20 +1321,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 const next =
                     lesson.blocks[currentStep];
 
+                lessonStep.textContent =
+                    currentStep + 1;
+
                 workspaceInstruction.textContent =
-                    `Great! Now add: ${next.text}`;
+                    `👉 Now find and drag: ${next.text}`;
+
+                renderPalette(
+                    next.category
+                );
             }
 
         } else {
 
-            showWorkspaceError(
-                `❌ Not this block yet. Think about: "${expected.text}"`
+            showError(
+                `❌ Not that one. Look for: ${expected.text}`
             );
+
+            highlightExpectedBlock();
         }
     }
 
 
-    function normalizeBlock(text) {
+    function normalize(text) {
 
         return text
             .toLowerCase()
@@ -1037,7 +1352,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    function showWorkspaceSuccess(message) {
+    function showSuccess(message) {
 
         workspaceInstruction.textContent =
             message;
@@ -1054,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    function showWorkspaceError(message) {
+    function showError(message) {
 
         workspaceInstruction.textContent =
             message;
@@ -1072,25 +1387,74 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================================
-       MISSION COMPLETION
+       HIGHLIGHT EXPECTED BLOCK
+    ========================================================= */
+
+    function highlightExpectedBlock() {
+
+        const lesson =
+            lessons[currentMission];
+
+        const expected =
+            lesson?.blocks[currentStep];
+
+        if (!expected) return;
+
+        document
+            .querySelectorAll(
+                "#blockPalette .scratch-block"
+            )
+            .forEach(block => {
+
+                const matches =
+                    normalize(
+                        block.dataset.text
+                    ) ===
+                    normalize(
+                        expected.text
+                    );
+
+                block.style.outline =
+                    matches
+                        ? "3px solid #facc15"
+                        : "";
+
+                block.style.outlineOffset =
+                    matches
+                        ? "2px"
+                        : "";
+            });
+    }
+
+
+    /* =========================================================
+       COMPLETE MISSION
     ========================================================= */
 
     function completeMission() {
 
-        if (completedMissions.has(currentMission)) {
+        if (
+            completedMissions.has(
+                currentMission
+            )
+        ) {
             return;
         }
 
-        completedMissions.add(currentMission);
+        completedMissions.add(
+            currentMission
+        );
 
         updateProgress();
 
         workspaceInstruction.textContent =
-            "🏆 Mission complete! You learned the Scratch concept.";
+            "🏆 Mission complete! You learned this Scratch concept.";
 
         setTimeout(() => {
 
-            if (completedMissions.size >= 7) {
+            if (
+                completedMissions.size >= 7
+            ) {
 
                 showScreen("final");
 
@@ -1099,24 +1463,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 showQuickCheck();
             }
 
-        }, 900);
+        }, 1000);
     }
 
 
+    /* =========================================================
+       PROGRESS
+    ========================================================= */
+
     function updateProgress() {
 
-        const progress =
+        const percentage =
             (completedMissions.size / 7) * 100;
 
-        const bar =
-            document.getElementById("auraProgress");
+        const progress =
+            document.getElementById(
+                "auraProgress"
+            );
 
         const counter =
-            document.getElementById("tutorialAura");
+            document.getElementById(
+                "tutorialAura"
+            );
 
-        if (bar) {
-            bar.style.width =
-                `${progress}%`;
+        if (progress) {
+            progress.style.width =
+                `${percentage}%`;
         }
 
         if (counter) {
@@ -1131,154 +1503,80 @@ document.addEventListener("DOMContentLoaded", () => {
                 const mission =
                     Number(card.dataset.mission);
 
-                if (completedMissions.has(mission)) {
+                if (
+                    completedMissions.has(
+                        mission
+                    )
+                ) {
 
-                    card.classList.add("completed");
-
-                    if (!card.querySelector(".mission-complete")) {
-
-                        const mark =
-                            document.createElement("span");
-
-                        mark.className =
-                            "mission-complete";
-
-                        mark.textContent = "✓";
-
-                        card.appendChild(mark);
-                    }
+                    card.classList.add(
+                        "completed"
+                    );
                 }
             });
     }
 
 
     /* =========================================================
-       QUICK CHECK
+       NEXT BUTTON — FIXED
     ========================================================= */
 
-    const quickCheck =
-        document.getElementById("quickCheck");
+    document
+        .getElementById("nextLessonStep")
+        ?.addEventListener(
+            "click",
+            () => {
 
-    const checkQuestion =
-        document.getElementById("checkQuestion");
+                const lesson =
+                    lessons[currentMission];
 
-    const checkBlock =
-        document.getElementById("checkBlock");
+                if (!lesson) return;
 
-    const checkOptions =
-        document.querySelectorAll(".check-option");
-
-    const checkResult =
-        document.getElementById("checkResult");
-
-
-    function showQuickCheck() {
-
-        if (!quickCheck) return;
-
-        const checks = [
-
-            {
-                block: "move 10 steps",
-                answer: "Motion"
-            },
-
-            {
-                block: "say [Hello!]",
-                answer: "Looks"
-            },
-
-            {
-                block: "start sound [Meow]",
-                answer: "Sound"
-            },
-
-            {
-                block: "when green flag clicked",
-                answer: "Events"
-            },
-
-            {
-                block: "forever",
-                answer: "Control"
-            },
-
-            {
-                block: "touching [mouse-pointer]?",
-                answer: "Sensing"
-            },
-
-            {
-                block: "pick random 1 to 10",
-                answer: "Operators"
-            }
-
-        ];
-
-        const check =
-            checks[
-                Math.floor(
-                    Math.random() * checks.length
-                )
-            ];
-
-        checkQuestion.textContent =
-            "Which Scratch category contains this block?";
-
-        checkBlock.innerHTML = "";
-
-        const block =
-            createScratchBlock(
-                check.block,
-                check.answer.toLowerCase(),
-                true
-            );
-
-        checkBlock.appendChild(block);
-
-        checkResult.textContent = "";
-
-        checkOptions.forEach(option => {
-
-            option.onclick = () => {
-
+                // If all blocks are already done
                 if (
-                    option.textContent.trim() ===
-                    check.answer
+                    currentStep >=
+                    lesson.blocks.length
                 ) {
 
-                    checkResult.textContent =
-                        "✅ Correct! You know your Scratch blocks!";
+                    completeMission();
 
-                    checkResult.style.color =
-                        "#16a34a";
-
-                    setTimeout(() => {
-
-                        quickCheck.classList.add(
-                            "hidden"
-                        );
-
-                        quickCheck.classList.remove(
-                            "active"
-                        );
-
-                    }, 900);
-
-                } else {
-
-                    checkResult.textContent =
-                        `💡 Hint: "${check.block}" belongs to ${check.answer}.`;
-
-                    checkResult.style.color =
-                        "#dc2626";
+                    return;
                 }
-            };
-        });
 
-        quickCheck.classList.remove("hidden");
-        quickCheck.classList.add("active");
-    }
+                const expected =
+                    lesson.blocks[currentStep];
+
+                // Directly teach the next block
+                workspaceInstruction.textContent =
+                    `👉 Find this Scratch block: ${expected.text}`;
+
+                lessonStep.textContent =
+                    currentStep + 1;
+
+                // Automatically open correct category
+                document
+                    .querySelectorAll(
+                        ".block-category"
+                    )
+                    .forEach(button => {
+
+                        button.classList.toggle(
+                            "active",
+                            button.dataset.category ===
+                            expected.category
+                        );
+                    });
+
+                renderPalette(
+                    expected.category
+                );
+
+                highlightExpectedBlock();
+
+                // Scroll palette to top
+                blockPalette.scrollTop = 0;
+            }
+        );
 
 
     /* =========================================================
@@ -1289,106 +1587,64 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll(".block-category")
         .forEach(button => {
 
-            button.addEventListener("click", () => {
+            button.addEventListener(
+                "click",
+                () => {
 
-                document
-                    .querySelectorAll(".block-category")
-                    .forEach(b =>
-                        b.classList.remove("active")
+                    document
+                        .querySelectorAll(
+                            ".block-category"
+                        )
+                        .forEach(b =>
+                            b.classList.remove(
+                                "active"
+                            )
+                        );
+
+                    button.classList.add(
+                        "active"
                     );
 
-                button.classList.add("active");
-
-                renderPalette(
-                    button.dataset.category
-                );
-            });
+                    renderPalette(
+                        button.dataset.category
+                    );
+                }
+            );
         });
 
 
     /* =========================================================
-       SHOW NEXT BLOCK
-    ========================================================= */
-
-    document
-        .getElementById("showBlockButton")
-        ?.addEventListener("click", () => {
-
-            const lesson =
-                lessons[currentMission];
-
-            if (!lesson) return;
-
-            const expected =
-                lesson.blocks[currentStep];
-
-            if (!expected) {
-
-                workspaceInstruction.textContent =
-                    "🏆 You already completed this mission.";
-
-                return;
-            }
-
-            workspaceInstruction.textContent =
-                `👀 Find this exact Scratch block: ${expected.text}`;
-
-            renderPalette(expected.category);
-
-            document
-                .querySelectorAll(".scratch-block")
-                .forEach(block => {
-
-                    if (
-                        normalizeBlock(
-                            block.dataset.text || ""
-                        ) ===
-                        normalizeBlock(
-                            expected.text
-                        )
-                    ) {
-
-                        block.style.outline =
-                            "4px solid #facc15";
-
-                        block.style.transform =
-                            "scale(1.05)";
-
-                        setTimeout(() => {
-
-                            block.style.outline = "";
-                            block.style.transform = "";
-
-                        }, 2200);
-                    }
-                });
-        });
-
-
-    /* =========================================================
-       RUN LESSON
+       RUN BUTTON
     ========================================================= */
 
     document
         .getElementById("runLessonButton")
-        ?.addEventListener("click", runWorkspace);
+        ?.addEventListener(
+            "click",
+            runWorkspace
+        );
 
 
     function runWorkspace() {
 
         const blocks =
-            [...lessonBlocks.children];
+            [
+                ...lessonBlocks.children
+            ];
 
         if (!blocks.length) {
 
-            workspaceInstruction.textContent =
-                "🧩 Drag a Scratch block into the workspace first.";
+            showError(
+                "🧩 Drag a Scratch block into the workspace first."
+            );
 
             return;
         }
 
         const preview =
-            document.getElementById("previewPlayer");
+            document.getElementById(
+                "previewPlayer"
+            );
 
         if (!preview) return;
 
@@ -1397,7 +1653,7 @@ document.addEventListener("DOMContentLoaded", () => {
         blocks.forEach(block => {
 
             const action =
-                findAction(
+                getAction(
                     block.textContent
                 );
 
@@ -1410,30 +1666,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
             }, delay);
 
-            delay += 700;
+            delay += 650;
         });
     }
 
 
-    function findAction(text) {
+    function getAction(text) {
 
         const lower =
             text.toLowerCase();
 
-        if (lower.includes("move")) return "move";
-        if (lower.includes("change x")) return "x";
-        if (lower.includes("change y")) return "y";
-        if (lower.includes("turn")) return "turn";
-        if (lower.includes("costume")) return "costume";
-        if (lower.includes("say")) return "say";
-        if (lower.includes("sound")) return "sound";
-        if (lower.includes("backdrop")) return "backdrop";
+        if (lower.includes("move"))
+            return "move";
+
+        if (lower.includes("change x"))
+            return "x";
+
+        if (lower.includes("change y"))
+            return "y";
+
+        if (lower.includes("turn"))
+            return "turn";
+
+        if (lower.includes("costume"))
+            return "costume";
+
+        if (lower.includes("say"))
+            return "say";
+
+        if (lower.includes("sound"))
+            return "sound";
+
+        if (lower.includes("backdrop"))
+            return "backdrop";
 
         return "none";
     }
 
 
-    function executeAction(action, preview) {
+    function executeAction(
+        action,
+        preview
+    ) {
 
         switch (action) {
 
@@ -1476,18 +1750,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             case "say":
 
-                showLessonBubble(
-                    preview,
-                    "Hello!"
+                showBubble(
+                    "Hello!",
+                    preview
                 );
 
                 break;
 
             case "sound":
 
-                showLessonBubble(
-                    preview,
-                    "🔊 Sound!"
+                showBubble(
+                    "🔊 Meow!",
+                    preview
                 );
 
                 break;
@@ -1495,7 +1769,9 @@ document.addEventListener("DOMContentLoaded", () => {
             case "backdrop":
 
                 document
-                    .getElementById("previewStage")
+                    .getElementById(
+                        "previewStage"
+                    )
                     ?.classList.toggle(
                         "alternate-backdrop"
                     );
@@ -1505,32 +1781,59 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    function showLessonBubble(target, text) {
+    function showBubble(
+        text,
+        preview
+    ) {
+
+        const stage =
+            document.getElementById(
+                "previewStage"
+            );
+
+        if (!stage) return;
 
         const bubble =
             document.createElement("div");
 
         bubble.textContent = text;
 
-        bubble.style.position = "absolute";
-        bubble.style.left = "55%";
-        bubble.style.top = "30%";
-        bubble.style.background = "white";
-        bubble.style.color = "#111827";
-        bubble.style.padding = "7px 10px";
-        bubble.style.borderRadius = "10px";
-        bubble.style.fontSize = "11px";
-        bubble.style.fontWeight = "700";
-        bubble.style.zIndex = "20";
+        bubble.style.position =
+            "absolute";
+
+        bubble.style.left =
+            "52%";
+
+        bubble.style.top =
+            "25%";
+
+        bubble.style.padding =
+            "7px 10px";
+
+        bubble.style.background =
+            "white";
+
+        bubble.style.color =
+            "#111827";
+
+        bubble.style.borderRadius =
+            "10px";
+
+        bubble.style.fontSize =
+            "11px";
+
+        bubble.style.fontWeight =
+            "700";
+
+        bubble.style.zIndex =
+            "50";
+
         bubble.style.boxShadow =
             "0 3px 12px rgba(0,0,0,.2)";
 
-        const stage =
-            document.getElementById("previewStage");
-
-        if (!stage) return;
-
-        stage.appendChild(bubble);
+        stage.appendChild(
+            bubble
+        );
 
         setTimeout(() => {
             bubble.remove();
@@ -1539,39 +1842,184 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================================
-       NEXT LESSON STEP
+       QUICK CHECK
     ========================================================= */
 
-    document
-        .getElementById("nextLessonStep")
-        ?.addEventListener("click", () => {
+    const quickCheck =
+        document.getElementById(
+            "quickCheck"
+        );
 
-            const lesson =
-                lessons[currentMission];
+    const checkQuestion =
+        document.getElementById(
+            "checkQuestion"
+        );
 
-            if (!lesson) return;
+    const checkBlock =
+        document.getElementById(
+            "checkBlock"
+        );
 
-            if (
-                currentStep <
-                lesson.blocks.length
-            ) {
+    const checkResult =
+        document.getElementById(
+            "checkResult"
+        );
 
-                const expected =
-                    lesson.blocks[currentStep];
+    const checkOptions =
+        document.querySelectorAll(
+            ".check-option"
+        );
 
-                workspaceInstruction.textContent =
-                    `👉 Now find and drag: ${expected.text}`;
 
-                renderPalette(expected.category);
+    function showQuickCheck() {
 
-                lessonStep.textContent =
-                    currentStep + 1;
+        if (!quickCheck) return;
 
-            } else {
+        const checks = [
 
-                completeMission();
+            {
+                block: "move 10 steps",
+                category: "motion",
+                answer: "Motion"
+            },
+
+            {
+                block: "say [Hello!]",
+                category: "looks",
+                answer: "Looks"
+            },
+
+            {
+                block: "start sound [Meow]",
+                category: "sound",
+                answer: "Sound"
+            },
+
+            {
+                block: "when green flag clicked",
+                category: "events",
+                answer: "Events"
+            },
+
+            {
+                block: "forever",
+                category: "control",
+                answer: "Control"
+            },
+
+            {
+                block: "touching [mouse-pointer]?",
+                category: "sensing",
+                answer: "Sensing"
+            },
+
+            {
+                block: "pick random 1 to 10",
+                category: "operators",
+                answer: "Operators"
             }
-        });
+
+        ];
+
+        const selected =
+            checks[
+                Math.floor(
+                    Math.random() *
+                    checks.length
+                )
+            ];
+
+        checkQuestion.textContent =
+            "Which Scratch category contains this block?";
+
+        checkBlock.innerHTML = "";
+
+        checkBlock.appendChild(
+            createScratchBlock(
+                selected.block,
+                selected.category,
+                true
+            )
+        );
+
+        checkResult.textContent = "";
+
+        // RANDOMIZE ANSWER POSITIONS
+        const answers = [
+            "Motion",
+            "Looks",
+            "Sound",
+            "Events"
+        ];
+
+        if (
+            !answers.includes(
+                selected.answer
+            )
+        ) {
+            answers[
+                Math.floor(
+                    Math.random() *
+                    answers.length
+                )
+            ] = selected.answer;
+        }
+
+        answers.sort(
+            () => Math.random() - 0.5
+        );
+
+        checkOptions.forEach(
+            (button, index) => {
+
+                button.textContent =
+                    answers[index] || "";
+
+                button.onclick = () => {
+
+                    if (
+                        button.textContent ===
+                        selected.answer
+                    ) {
+
+                        checkResult.textContent =
+                            "✅ Correct!";
+
+                        checkResult.style.color =
+                            "#16a34a";
+
+                        setTimeout(() => {
+
+                            quickCheck.classList.add(
+                                "hidden"
+                            );
+
+                            quickCheck.classList.remove(
+                                "active"
+                            );
+
+                        }, 700);
+
+                    } else {
+
+                        checkResult.textContent =
+                            `💡 Hint: ${selected.block} belongs to ${selected.answer}.`;
+
+                        checkResult.style.color =
+                            "#dc2626";
+                    }
+                };
+            }
+        );
+
+        quickCheck.classList.remove(
+            "hidden"
+        );
+
+        quickCheck.classList.add(
+            "active"
+        );
+    }
 
 
     /* =========================================================
@@ -1579,27 +2027,37 @@ document.addEventListener("DOMContentLoaded", () => {
     ========================================================= */
 
     document
-        .getElementById("backToMissions")
-        ?.addEventListener("click", () => {
+        .getElementById(
+            "backToMissions"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
 
-            showScreen("tutorial");
-        });
+                showScreen("tutorial");
+            }
+        );
 
 
     /* =========================================================
-       FINAL REPLAY
+       REPLAY
     ========================================================= */
 
     document
-        .getElementById("replayButton")
-        ?.addEventListener("click", () => {
+        .getElementById(
+            "replayButton"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
 
-            completedMissions.clear();
+                completedMissions.clear();
 
-            updateProgress();
+                updateProgress();
 
-            showScreen("tutorial");
-        });
+                showScreen("tutorial");
+            }
+        );
 
 
     /* =========================================================
