@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    "use strict";
 
     /* =========================================================
        SCREEN SYSTEM
@@ -14,41 +15,15 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     function showScreen(name) {
-        Object.entries(screens).forEach(([key, screen]) => {
-            if (!screen) return;
+        Object.entries(screens).forEach(([key, el]) => {
+            if (!el) return;
 
-            screen.classList.toggle("hidden", key !== name);
-            screen.classList.toggle("active", key === name);
+            el.classList.toggle("hidden", key !== name);
+            el.classList.toggle("active", key === name);
         });
 
         document.body.dataset.screen = name;
     }
-
-
-    /* =========================================================
-       INTRO
-    ========================================================= */
-
-    document.getElementById("playGameButton")?.addEventListener("click", () => {
-        startGame();
-        showScreen("game");
-
-        // Important: make keyboard controls work immediately
-        gameWorld?.focus();
-    });
-
-    document.getElementById("tutorialButton")?.addEventListener("click", () => {
-        showScreen("tutorial");
-    });
-
-    document.getElementById("revealButton")?.addEventListener("click", () => {
-        showScreen("tutorial");
-    });
-
-    document.getElementById("exitGame")?.addEventListener("click", () => {
-        stopGame();
-        showScreen("intro");
-    });
 
 
     /* =========================================================
@@ -62,9 +37,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const auraScore = document.getElementById("auraScore");
     const livesDisplay = document.getElementById("lives");
     const gameMessage = document.getElementById("gameMessage");
+    const gameObjective = document.getElementById("gameObjective");
 
     let gameRunning = false;
-    let gameFrame = null;
+    let gameFrame = 0;
 
     let score = 0;
     let lives = 3;
@@ -73,9 +49,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let playerY = 100;
 
     let shadowX = 500;
-    let shadowY = 200;
+    let shadowY = 180;
 
-    const keys = {};
+    let lastHitTime = 0;
+
+    const keys = Object.create(null);
 
     const orbPositions = [
         ["18%", "25%"],
@@ -86,61 +64,88 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
 
+    /* Make game focusable */
+    if (gameWorld) {
+        gameWorld.setAttribute("tabindex", "0");
+        gameWorld.style.touchAction = "none";
+    }
+
+
     function startGame() {
+        if (!gameWorld || !player) return;
 
         gameRunning = true;
 
         score = 0;
         lives = 3;
+        lastHitTime = 0;
+
+        const width = gameWorld.clientWidth;
+        const height = gameWorld.clientHeight;
 
         playerX = 70;
-        playerY = 100;
+        playerY = Math.max(
+            70,
+            Math.min(120, height - 100)
+        );
 
-        shadowX = Math.max(300, gameWorld.clientWidth - 180);
-        shadowY = 180;
+        shadowX = Math.max(
+            260,
+            width - 180
+        );
+
+        shadowY = Math.max(
+            120,
+            Math.min(220, height - 180)
+        );
 
         auraScore.textContent = score;
         livesDisplay.textContent = lives;
 
-        if (gameMessage) {
-            gameMessage.classList.add("hidden");
-        }
-
+        gameMessage?.classList.add("hidden");
         portal?.classList.remove("unlocked");
 
-        const objective =
-            document.getElementById("gameObjective");
-
-        if (objective) {
-            objective.textContent =
+        if (gameObjective) {
+            gameObjective.textContent =
                 "COLLECT THE AURA ORBS!";
         }
 
-        document.querySelectorAll(".aura-orb").forEach((orb, i) => {
+        document
+            .querySelectorAll(".aura-orb")
+            .forEach((orb, i) => {
 
-            orb.style.display = "block";
+                orb.style.display = "block";
 
-            orb.style.left = orbPositions[i][0];
-            orb.style.top = orbPositions[i][1];
-        });
+                if (orbPositions[i]) {
+                    orb.style.left =
+                        orbPositions[i][0];
+
+                    orb.style.top =
+                        orbPositions[i][1];
+                }
+            });
 
         updatePlayer();
         updateShadow();
 
         cancelAnimationFrame(gameFrame);
 
-        gameLoop();
+        gameFrame =
+            requestAnimationFrame(gameLoop);
+
+        setTimeout(() => {
+            gameWorld.focus();
+        }, 50);
     }
 
 
     function stopGame() {
-
         gameRunning = false;
 
         cancelAnimationFrame(gameFrame);
 
         Object.keys(keys).forEach(key => {
-            keys[key] = false;
+            delete keys[key];
         });
     }
 
@@ -150,13 +155,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!gameRunning) return;
 
         movePlayer();
+
         keepPlayerInside();
 
         updatePlayer();
+
         updateShadow();
 
         collectOrbs();
+
         checkShadowCollision();
+
         checkPortal();
 
         gameFrame =
@@ -168,37 +177,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const speed = 5;
 
-        // Arrow keys
-        if (keys.ArrowLeft) {
+        if (keys.ArrowLeft || keys.a) {
             playerX -= speed;
         }
 
-        if (keys.ArrowRight) {
+        if (keys.ArrowRight || keys.d) {
             playerX += speed;
         }
 
-        if (keys.ArrowUp) {
+        if (keys.ArrowUp || keys.w) {
             playerY -= speed;
         }
 
-        if (keys.ArrowDown) {
-            playerY += speed;
-        }
-
-        // WASD
-        if (keys.a) {
-            playerX -= speed;
-        }
-
-        if (keys.d) {
-            playerX += speed;
-        }
-
-        if (keys.w) {
-            playerY -= speed;
-        }
-
-        if (keys.s) {
+        if (keys.ArrowDown || keys.s) {
             playerY += speed;
         }
     }
@@ -259,19 +250,19 @@ document.addEventListener("DOMContentLoaded", () => {
             playerY - shadowY;
 
         const distance =
-            Math.sqrt(dx * dx + dy * dy);
+            Math.hypot(dx, dy);
 
         if (distance > 5) {
 
-            const shadowSpeed = 0.45;
+            const speed = 0.45;
 
             shadowX +=
                 (dx / distance) *
-                shadowSpeed;
+                speed;
 
             shadowY +=
                 (dy / distance) *
-                shadowSpeed;
+                speed;
         }
 
         shadow.style.left =
@@ -314,12 +305,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     touching(player, orb)
                 ) {
 
-                    orb.style.display = "none";
+                    orb.style.display =
+                        "none";
 
-                    score +=
-                        Number(
-                            orb.dataset.value || 10
-                        );
+                    score += Number(
+                        orb.dataset.value || 10
+                    );
 
                     auraScore.textContent =
                         score;
@@ -330,13 +321,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             "unlocked"
                         );
 
-                        const objective =
-                            document.getElementById(
-                                "gameObjective"
-                            );
-
-                        if (objective) {
-                            objective.textContent =
+                        if (gameObjective) {
+                            gameObjective.textContent =
                                 "⚡ PORTAL UNLOCKED — REACH IT!";
                         }
                     }
@@ -345,13 +331,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    let lastHitTime = 0;
-
     function checkShadowCollision() {
 
         if (
             !touching(player, shadow) ||
-            Date.now() - lastHitTime < 1500
+            Date.now() - lastHitTime < 1200
         ) {
             return;
         }
@@ -367,12 +351,14 @@ document.addEventListener("DOMContentLoaded", () => {
         playerX = 70;
         playerY = 100;
 
+        updatePlayer();
+
         if (lives <= 0) {
 
             stopGame();
 
             showGameMessage(
-                "GAME OVER 😵<br><small>Click EXIT and play again.</small>"
+                "GAME OVER 😵<br><small>Press EXIT and play again.</small>"
             );
         }
     }
@@ -406,86 +392,87 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================================
-       KEYBOARD — FIXED
+       KEYBOARD CONTROLS
     ========================================================= */
 
-    window.addEventListener("keydown", event => {
-
-        const gameActive =
-            !screens.game?.classList.contains("hidden");
-
-        if (!gameActive) return;
-
-        const allowedKeys = [
-            "ArrowUp",
-            "ArrowDown",
-            "ArrowLeft",
-            "ArrowRight",
-            "w",
-            "a",
-            "s",
-            "d",
-            "W",
-            "A",
-            "S",
-            "D"
-        ];
-
-        if (allowedKeys.includes(event.key)) {
-
-            event.preventDefault();
-
-            if (
-                event.key === "W" ||
-                event.key === "A" ||
-                event.key === "S" ||
-                event.key === "D"
-            ) {
-                keys[event.key.toLowerCase()] = true;
-            } else {
-                keys[event.key] = true;
-            }
-        }
-    });
+    const gameKeys = new Set([
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "w",
+        "a",
+        "s",
+        "d",
+        "W",
+        "A",
+        "S",
+        "D"
+    ]);
 
 
-    window.addEventListener("keyup", event => {
-
-        keys[event.key] = false;
-
-        if (
-            ["W", "A", "S", "D"].includes(event.key)
-        ) {
-            keys[event.key.toLowerCase()] = false;
-        }
-    });
-
-
-    /* =========================================================
-       GAME TOUCH CONTROL
-    ========================================================= */
-
-    let playerPointerActive = false;
-
-    player?.addEventListener(
-        "pointerdown",
+    window.addEventListener(
+        "keydown",
         event => {
 
-            event.preventDefault();
+            if (!gameRunning) return;
 
-            playerPointerActive = true;
+            if (gameKeys.has(event.key)) {
 
-            player.setPointerCapture?.(
-                event.pointerId
+                event.preventDefault();
+
+                const key =
+                    event.key.length === 1
+                        ? event.key.toLowerCase()
+                        : event.key;
+
+                keys[key] = true;
+            }
+        },
+        { passive: false }
+    );
+
+
+    window.addEventListener(
+        "keyup",
+        event => {
+
+            const key =
+                event.key.length === 1
+                    ? event.key.toLowerCase()
+                    : event.key;
+
+            delete keys[key];
+        }
+    );
+
+
+    window.addEventListener(
+        "blur",
+        () => {
+
+            Object.keys(keys).forEach(
+                key => delete keys[key]
             );
         }
     );
 
+
+    /* =========================================================
+       SMARTBOARD / TOUCH GAME CONTROL
+    ========================================================= */
+
     gameWorld?.addEventListener(
-        "pointermove",
+        "pointerdown",
         event => {
 
-            if (!playerPointerActive) return;
+            if (!gameRunning) return;
+
+            if (event.target === player) {
+                return;
+            }
+
+            event.preventDefault();
 
             const rect =
                 gameWorld.getBoundingClientRect();
@@ -501,16 +488,69 @@ document.addEventListener("DOMContentLoaded", () => {
                 player.offsetHeight / 2;
 
             keepPlayerInside();
+
             updatePlayer();
-        }
+        },
+        { passive: false }
     );
 
-    window.addEventListener(
-        "pointerup",
-        () => {
-            playerPointerActive = false;
-        }
-    );
+
+    /* =========================================================
+       INTRO / NAVIGATION
+    ========================================================= */
+
+    document
+        .getElementById("playGameButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                /*
+                 IMPORTANT:
+                 Show the game FIRST.
+                 Then calculate its dimensions.
+                */
+
+                showScreen("game");
+
+                requestAnimationFrame(
+                    startGame
+                );
+            }
+        );
+
+
+    document
+        .getElementById("tutorialButton")
+        ?.addEventListener(
+            "click",
+            () => {
+                showScreen("tutorial");
+            }
+        );
+
+
+    document
+        .getElementById("exitGame")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopGame();
+
+                showScreen("intro");
+            }
+        );
+
+
+    document
+        .getElementById("revealButton")
+        ?.addEventListener(
+            "click",
+            () => {
+                showScreen("tutorial");
+            }
+        );
 
 
     /* =========================================================
@@ -521,154 +561,207 @@ document.addEventListener("DOMContentLoaded", () => {
 
         1: {
             title: "Working with Sprites",
+
             description:
                 "Sprites are the characters and objects that we program in Scratch.",
+
             points: [
                 "Add a new sprite.",
                 "Select a sprite.",
                 "Delete a sprite.",
                 "Each sprite can have its own scripts."
             ],
+
             tip:
                 "A sprite is a character or object that can be programmed.",
-            category: "events",
+
             blocks: [
                 {
-                    text: "when green flag clicked",
-                    category: "events"
+                    text:
+                        "when green flag clicked",
+                    category:
+                        "events"
                 }
             ]
         },
 
+
         2: {
             title: "Make a Sprite Move",
+
             description:
                 "Motion blocks control the movement of a sprite.",
+
             points: [
                 "Motion blocks are blue.",
                 "move 10 steps moves the sprite.",
                 "change x by 10 moves horizontally.",
                 "change y by 10 moves vertically."
             ],
+
             tip:
                 "Blue Motion blocks control sprite movement.",
-            category: "motion",
+
             blocks: [
                 {
-                    text: "move 10 steps",
-                    category: "motion"
+                    text:
+                        "move 10 steps",
+                    category:
+                        "motion"
                 },
+
                 {
-                    text: "change x by 10",
-                    category: "motion"
+                    text:
+                        "change x by 10",
+                    category:
+                        "motion"
                 }
             ]
         },
 
+
         3: {
             title: "Change Costumes",
+
             description:
                 "A sprite can have different costumes.",
+
             points: [
                 "Open the Costumes tab.",
                 "Add another costume.",
                 "Use next costume.",
                 "Costumes change the appearance of a sprite."
             ],
+
             tip:
                 "Costumes are different appearances of the same sprite.",
-            category: "looks",
+
             blocks: [
                 {
-                    text: "next costume",
-                    category: "looks"
+                    text:
+                        "next costume",
+                    category:
+                        "looks"
                 },
+
                 {
-                    text: "switch costume to [costume2]",
-                    category: "looks"
+                    text:
+                        "switch costume to [costume2]",
+                    category:
+                        "looks"
                 }
             ]
         },
 
+
         4: {
             title: "Program Two Sprites",
+
             description:
                 "Different sprites can have different scripts.",
+
             points: [
                 "Add another sprite.",
                 "Select the sprite.",
                 "Create its own script.",
                 "Both sprites can react to the green flag."
             ],
+
             tip:
                 "Every sprite can have its own scripts.",
-            category: "events",
+
             blocks: [
                 {
-                    text: "when green flag clicked",
-                    category: "events"
+                    text:
+                        "when green flag clicked",
+                    category:
+                        "events"
                 },
+
                 {
-                    text: "say [Hello!] for 2 seconds",
-                    category: "looks"
+                    text:
+                        "say [Hello!] for 2 seconds",
+                    category:
+                        "looks"
                 }
             ]
         },
 
+
         5: {
             title: "Change the Backdrop",
+
             description:
                 "The Stage uses backdrops as its background.",
+
             points: [
                 "Click the Stage.",
                 "Open Backdrops.",
                 "Choose a backdrop.",
                 "Backdrops belong to the Stage."
             ],
+
             tip:
                 "Sprite = character/object. Backdrop = Stage background.",
-            category: "looks",
+
             blocks: [
                 {
-                    text: "switch backdrop to [backdrop1]",
-                    category: "looks"
+                    text:
+                        "switch backdrop to [backdrop1]",
+                    category:
+                        "looks"
                 },
+
                 {
-                    text: "next backdrop",
-                    category: "looks"
+                    text:
+                        "next backdrop",
+                    category:
+                        "looks"
                 }
             ]
         },
 
+
         6: {
             title: "Working with Sounds",
+
             description:
                 "Sounds make Scratch projects interactive.",
+
             points: [
                 "Open the Sounds tab.",
                 "Choose or add a sound.",
                 "Use a Sound block.",
                 "Sound blocks are pink."
             ],
+
             tip:
                 "Sounds can be added to sprites and played by scripts.",
-            category: "sound",
+
             blocks: [
                 {
-                    text: "start sound [Meow]",
-                    category: "sound"
+                    text:
+                        "start sound [Meow]",
+                    category:
+                        "sound"
                 },
+
                 {
-                    text: "play sound [Meow] until done",
-                    category: "sound"
+                    text:
+                        "play sound [Meow] until done",
+                    category:
+                        "sound"
                 }
             ]
         },
 
+
         7: {
             title: "Build a Mini Game",
+
             description:
                 "Combine your Scratch skills to build an interactive project.",
+
             points: [
                 "Start with the green flag.",
                 "Move your sprite.",
@@ -676,21 +769,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 "Use costumes and sounds.",
                 "Test your project."
             ],
+
             tip:
                 "Scratch projects are made by combining small scripts.",
-            category: "events",
+
             blocks: [
                 {
-                    text: "when green flag clicked",
-                    category: "events"
+                    text:
+                        "when green flag clicked",
+                    category:
+                        "events"
                 },
+
                 {
-                    text: "forever",
-                    category: "control"
+                    text:
+                        "forever",
+                    category:
+                        "control"
                 },
+
                 {
-                    text: "move 10 steps",
-                    category: "motion"
+                    text:
+                        "move 10 steps",
+                    category:
+                        "motion"
                 }
             ]
         }
@@ -698,7 +800,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================================
-       PALETTE
+       SCRATCH PALETTE
     ========================================================= */
 
     const paletteBlocks = {
@@ -715,6 +817,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "set y to 0"
         ],
 
+
         looks: [
             "say [Hello!] for 2 seconds",
             "say [Hello!]",
@@ -725,6 +828,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "next backdrop"
         ],
 
+
         sound: [
             "start sound [Meow]",
             "play sound [Meow] until done",
@@ -733,6 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "set volume to 100%"
         ],
 
+
         events: [
             "when green flag clicked",
             "when [space] key pressed",
@@ -740,6 +845,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "broadcast [message1]",
             "broadcast [message1] and wait"
         ],
+
 
         control: [
             "wait 1 seconds",
@@ -751,6 +857,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "stop [all]"
         ],
 
+
         sensing: [
             "touching [mouse-pointer]?",
             "touching color [ ]?",
@@ -760,6 +867,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "distance to [mouse-pointer]"
         ],
 
+
         operators: [
             "pick random 1 to 10",
             "join [hello] [world]",
@@ -768,6 +876,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "1 = 1",
             "1 < 1"
         ],
+
 
         variables: [
             "set [my variable] to 0",
@@ -783,10 +892,14 @@ document.addEventListener("DOMContentLoaded", () => {
     ========================================================= */
 
     const lessonTitle =
-        document.getElementById("lessonTitle");
+        document.getElementById(
+            "lessonTitle"
+        );
 
     const lessonDescription =
-        document.getElementById("lessonDescription");
+        document.getElementById(
+            "lessonDescription"
+        );
 
     const lessonLearningPoints =
         document.getElementById(
@@ -794,22 +907,34 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     const teacherTip =
-        document.getElementById("teacherTip");
+        document.getElementById(
+            "teacherTip"
+        );
 
     const lessonNumber =
-        document.getElementById("lessonNumber");
+        document.getElementById(
+            "lessonNumber"
+        );
 
     const lessonStep =
-        document.getElementById("lessonStep");
+        document.getElementById(
+            "lessonStep"
+        );
 
     const paletteCategory =
-        document.getElementById("paletteCategory");
+        document.getElementById(
+            "paletteCategory"
+        );
 
     const blockPalette =
-        document.getElementById("blockPalette");
+        document.getElementById(
+            "blockPalette"
+        );
 
     const lessonBlocks =
-        document.getElementById("lessonBlocks");
+        document.getElementById(
+            "lessonBlocks"
+        );
 
     const workspaceInstruction =
         document.getElementById(
@@ -817,41 +942,95 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     const blockCount =
-        document.getElementById("blockCount");
+        document.getElementById(
+            "blockCount"
+        );
+
+    const workspaceHint =
+        document.getElementById(
+            "workspaceHint"
+        );
+
+    const nextButton =
+        document.getElementById(
+            "nextLessonStep"
+        );
+
+    const showBlockButton =
+        document.getElementById(
+            "showBlockButton"
+        );
+
 
     let currentMission = 1;
-    let currentStep = 0;
+
+    let currentBlockIndex = 0;
+
+    /*
+       0 = LEARN
+       1 = SEE
+       2 = DO
+    */
+    let lessonPhase = 0;
 
     const completedMissions =
         new Set();
 
 
     /* =========================================================
-       MISSION BUTTONS
+       HELPERS
     ========================================================= */
 
-    document
-        .querySelectorAll(".mission-card")
-        .forEach(card => {
+    function normalize(text) {
 
-            card.addEventListener("click", () => {
+        return String(text)
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+    }
 
-                openLesson(
-                    Number(card.dataset.mission)
-                );
-            });
-        });
 
+    /* =========================================================
+       OPEN LESSON
+    ========================================================= */
 
     function openLesson(mission) {
 
-        currentMission = mission;
-        currentStep = 0;
+        if (!lessons[mission]) {
+            return;
+        }
+
+        currentMission =
+            mission;
+
+        currentBlockIndex =
+            0;
+
+        lessonPhase =
+            0;
 
         renderLesson();
 
         showScreen("lesson");
     }
+
+
+    document
+        .querySelectorAll(".mission-card")
+        .forEach(card => {
+
+            card.addEventListener(
+                "click",
+                () => {
+
+                    openLesson(
+                        Number(
+                            card.dataset.mission
+                        )
+                    );
+                }
+            );
+        });
 
 
     /* =========================================================
@@ -877,38 +1056,197 @@ document.addEventListener("DOMContentLoaded", () => {
         lessonNumber.textContent =
             currentMission;
 
-        lessonLearningPoints.innerHTML = "";
+
+        lessonLearningPoints.innerHTML =
+            "";
 
         lesson.points.forEach(point => {
 
             const li =
-                document.createElement("li");
+                document.createElement(
+                    "li"
+                );
 
-            li.textContent = point;
+            li.textContent =
+                point;
 
-            lessonLearningPoints.appendChild(li);
+            lessonLearningPoints.appendChild(
+                li
+            );
         });
 
-        lessonBlocks.innerHTML = "";
+
+        lessonBlocks.innerHTML =
+            "";
 
         blockCount.textContent =
             "0 blocks";
 
-        lessonStep.textContent = "1";
 
-        workspaceInstruction.textContent =
-            `👉 Find and drag: ${lesson.blocks[0].text}`;
+        currentBlockIndex =
+            0;
 
-        renderPalette(
-            lesson.blocks[0].category
-        );
+        lessonPhase =
+            0;
+
+
+        renderCurrentPhase();
 
         updateProgress();
     }
 
 
+    function renderCurrentPhase() {
+
+        const lesson =
+            lessons[currentMission];
+
+        const target =
+            lesson.blocks[
+                currentBlockIndex
+            ];
+
+
+        if (!target) {
+
+            completeMission();
+
+            return;
+        }
+
+
+        lessonStep.textContent =
+            currentBlockIndex + 1;
+
+
+        /* =========================
+           LEARN
+        ========================= */
+
+        if (lessonPhase === 0) {
+
+            workspaceInstruction.textContent =
+                "🧠 LEARN: Read the explanation, then press NEXT to see the exact Scratch block.";
+
+            workspaceHint.textContent =
+                "Learning";
+
+            nextButton.textContent =
+                "SEE THE BLOCK →";
+
+            showBlockButton.textContent =
+                "SHOW NEXT BLOCK";
+
+            renderPalette(
+                lesson.category ||
+                target.category,
+                false
+            );
+        }
+
+
+        /* =========================
+           SEE
+        ========================= */
+
+        if (lessonPhase === 1) {
+
+            workspaceInstruction.textContent =
+                `👀 THIS IS THE EXACT BLOCK: ${target.text}`;
+
+            workspaceHint.textContent =
+                "Look carefully";
+
+            nextButton.textContent =
+                "TRY IT →";
+
+            renderPalette(
+                target.category,
+                true
+            );
+
+            highlightExpectedBlock();
+        }
+
+
+        /* =========================
+           DO
+        ========================= */
+
+        if (lessonPhase === 2) {
+
+            workspaceInstruction.textContent =
+                "🧩 DRAG or TAP the highlighted block into SCRIPTS.";
+
+            workspaceHint.textContent =
+                "Drop the block here";
+
+            nextButton.textContent =
+                "NEXT →";
+
+            renderPalette(
+                target.category,
+                true
+            );
+
+            highlightExpectedBlock();
+        }
+    }
+
+
     /* =========================================================
-       SCRATCH BLOCK CREATION
+       RENDER PALETTE
+    ========================================================= */
+
+    function renderPalette(
+        category,
+        highlightTarget
+    ) {
+
+        if (!blockPalette) return;
+
+        blockPalette.innerHTML =
+            "";
+
+        paletteCategory.textContent =
+            category.charAt(0).toUpperCase() +
+            category.slice(1);
+
+
+        document
+            .querySelectorAll(".block-category")
+            .forEach(button => {
+
+                button.classList.toggle(
+                    "active",
+                    button.dataset.category ===
+                    category
+                );
+            });
+
+
+        (
+            paletteBlocks[category] ||
+            []
+        ).forEach(text => {
+
+            blockPalette.appendChild(
+                createPaletteBlock(
+                    text,
+                    category
+                )
+            );
+        });
+
+
+        if (highlightTarget) {
+            highlightExpectedBlock();
+        }
+    }
+
+
+    /* =========================================================
+       SCRATCH BLOCK
     ========================================================= */
 
     function createScratchBlock(
@@ -918,7 +1256,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
 
         const block =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
         block.className =
             `scratch-block ${category}`;
@@ -932,279 +1272,370 @@ document.addEventListener("DOMContentLoaded", () => {
         block.dataset.category =
             category;
 
-        if (!workspace) {
 
-            block.draggable = true;
+        if (workspace) {
 
-            block.addEventListener(
-                "dragstart",
-                event => {
-
-                    event.dataTransfer.effectAllowed =
-                        "copy";
-
-                    event.dataTransfer.setData(
-                        "text/plain",
-                        JSON.stringify({
-                            text,
-                            category
-                        })
-                    );
-
-                    block.classList.add(
-                        "dragging"
-                    );
-                }
+            block.classList.add(
+                "workspace-block"
             );
 
-            block.addEventListener(
-                "dragend",
-                () => {
-                    block.classList.remove(
-                        "dragging"
-                    );
-                }
-            );
-
-            setupTouchDrag(block);
+            block.style.cursor =
+                "default";
         }
+
 
         return block;
     }
 
 
-    function renderPalette(category) {
+    /* =========================================================
+       ROBUST POINTER DRAG
+    ========================================================= */
 
-        blockPalette.innerHTML = "";
+    function createPaletteBlock(
+        text,
+        category
+    ) {
 
-        paletteCategory.textContent =
-            category.charAt(0).toUpperCase() +
-            category.slice(1);
-
-        const blocks =
-            paletteBlocks[category] || [];
-
-        blocks.forEach(text => {
-
-            blockPalette.appendChild(
-                createScratchBlock(
-                    text,
-                    category
-                )
+        const block =
+            createScratchBlock(
+                text,
+                category,
+                false
             );
-        });
 
-        highlightExpectedBlock();
-    }
+        block.draggable =
+            false;
 
-
-    /* =========================================================
-       DESKTOP DROP
-    ========================================================= */
-
-    lessonBlocks.addEventListener(
-        "dragenter",
-        event => {
-
-            event.preventDefault();
-
-            lessonBlocks.style.background =
-                "rgba(76,151,255,0.10)";
-        }
-    );
-
-    lessonBlocks.addEventListener(
-        "dragover",
-        event => {
-
-            event.preventDefault();
-
-            event.dataTransfer.dropEffect =
-                "copy";
-        }
-    );
-
-    lessonBlocks.addEventListener(
-        "dragleave",
-        event => {
-
-            if (
-                event.target === lessonBlocks
-            ) {
-                lessonBlocks.style.background =
-                    "";
-            }
-        }
-    );
-
-    lessonBlocks.addEventListener(
-        "drop",
-        event => {
-
-            event.preventDefault();
-
-            lessonBlocks.style.background =
-                "";
-
-            const raw =
-                event.dataTransfer.getData(
-                    "text/plain"
-                );
-
-            if (!raw) return;
-
-            try {
-
-                const data =
-                    JSON.parse(raw);
-
-                addBlockToWorkspace(
-                    data.text,
-                    data.category
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "Block drop error:",
-                    error
-                );
-            }
-        }
-    );
+        block.style.touchAction =
+            "none";
 
 
-    /* =========================================================
-       TOUCH DRAG — SMARTBOARD
-    ========================================================= */
+        let pointerId =
+            null;
 
-    let touchDragging = false;
-    let touchBlock = null;
-    let touchData = null;
-    let touchPointerId = null;
+        let startX =
+            0;
 
-    function setupTouchDrag(block) {
+        let startY =
+            0;
+
+        let dragging =
+            false;
+
+        let ghost =
+            null;
+
 
         block.addEventListener(
             "pointerdown",
             event => {
 
                 if (
-                    event.pointerType === "mouse" &&
+                    event.pointerType ===
+                    "mouse" &&
                     event.button !== 0
                 ) {
                     return;
                 }
 
+
                 event.preventDefault();
 
-                touchDragging = true;
 
-                touchPointerId =
+                pointerId =
                     event.pointerId;
 
-                touchData = {
-                    text: block.dataset.text,
-                    category: block.dataset.category
-                };
+                startX =
+                    event.clientX;
 
-                touchBlock =
-                    block.cloneNode(true);
+                startY =
+                    event.clientY;
 
-                touchBlock.style.position =
-                    "fixed";
+                dragging =
+                    false;
 
-                touchBlock.style.zIndex =
-                    "99999";
 
-                touchBlock.style.pointerEvents =
-                    "none";
+                try {
+                    block.setPointerCapture(
+                        pointerId
+                    );
+                } catch (_) {}
 
-                touchBlock.style.width =
-                    `${block.getBoundingClientRect().width}px`;
 
-                touchBlock.style.opacity =
-                    "0.92";
+                const move =
+                    ev => {
 
-                touchBlock.style.margin =
-                    "0";
+                        if (
+                            ev.pointerId !==
+                            pointerId
+                        ) {
+                            return;
+                        }
 
-                document.body.appendChild(
-                    touchBlock
+
+                        ev.preventDefault();
+
+
+                        const distance =
+                            Math.hypot(
+                                ev.clientX -
+                                startX,
+
+                                ev.clientY -
+                                startY
+                            );
+
+
+                        if (
+                            !dragging &&
+                            distance < 8
+                        ) {
+                            return;
+                        }
+
+
+                        if (!dragging) {
+
+                            dragging =
+                                true;
+
+                            ghost =
+                                block.cloneNode(
+                                    true
+                                );
+
+                            ghost.classList.add(
+                                "drag-ghost"
+                            );
+
+
+                            Object.assign(
+                                ghost.style,
+                                {
+                                    position:
+                                        "fixed",
+
+                                    zIndex:
+                                        "99999",
+
+                                    pointerEvents:
+                                        "none",
+
+                                    opacity:
+                                        "0.9",
+
+                                    margin:
+                                        "0",
+
+                                    width:
+                                        `${Math.min(
+                                            block.getBoundingClientRect().width,
+                                            240
+                                        )}px`
+                                }
+                            );
+
+
+                            document.body.appendChild(
+                                ghost
+                            );
+                        }
+
+
+                        ghost.style.left =
+                            `${ev.clientX - 20}px`;
+
+                        ghost.style.top =
+                            `${ev.clientY - 20}px`;
+
+
+                        highlightDropZone(
+                            ev.clientX,
+                            ev.clientY
+                        );
+                    };
+
+
+                const end =
+                    ev => {
+
+                        if (
+                            ev.pointerId !==
+                            pointerId
+                        ) {
+                            return;
+                        }
+
+
+                        ev.preventDefault();
+
+
+                        block.removeEventListener(
+                            "pointermove",
+                            move
+                        );
+
+                        block.removeEventListener(
+                            "pointerup",
+                            end
+                        );
+
+                        block.removeEventListener(
+                            "pointercancel",
+                            cancel
+                        );
+
+
+                        const wasDragging =
+                            dragging;
+
+
+                        if (ghost) {
+                            ghost.remove();
+                        }
+
+                        ghost =
+                            null;
+
+
+                        clearDropZone();
+
+
+                        const rect =
+                            lessonBlocks.getBoundingClientRect();
+
+
+                        const inside =
+                            ev.clientX >= rect.left &&
+                            ev.clientX <= rect.right &&
+                            ev.clientY >= rect.top &&
+                            ev.clientY <= rect.bottom;
+
+
+                        /*
+                           Desktop:
+                           actual drag must end inside workspace.
+
+                           Smartboard:
+                           simple TAP also adds block.
+                        */
+
+                        if (
+                            wasDragging &&
+                            inside
+                        ) {
+
+                            addBlockToWorkspace(
+                                text,
+                                category
+                            );
+
+                        } else if (
+                            !wasDragging
+                        ) {
+
+                            addBlockToWorkspace(
+                                text,
+                                category
+                            );
+                        }
+
+
+                        dragging =
+                            false;
+
+                        pointerId =
+                            null;
+                    };
+
+
+                const cancel =
+                    ev => {
+
+                        if (
+                            ev.pointerId !==
+                            pointerId
+                        ) {
+                            return;
+                        }
+
+
+                        block.removeEventListener(
+                            "pointermove",
+                            move
+                        );
+
+                        block.removeEventListener(
+                            "pointerup",
+                            end
+                        );
+
+                        block.removeEventListener(
+                            "pointercancel",
+                            cancel
+                        );
+
+
+                        if (ghost) {
+                            ghost.remove();
+                        }
+
+                        ghost =
+                            null;
+
+
+                        clearDropZone();
+
+
+                        dragging =
+                            false;
+
+                        pointerId =
+                            null;
+                    };
+
+
+                block.addEventListener(
+                    "pointermove",
+                    move,
+                    { passive: false }
                 );
 
-                moveTouchBlock(event);
-
-                block.setPointerCapture?.(
-                    event.pointerId
+                block.addEventListener(
+                    "pointerup",
+                    end,
+                    { passive: false }
                 );
-            }
-        );
 
-        block.addEventListener(
-            "pointermove",
-            event => {
-
-                if (
-                    !touchDragging ||
-                    event.pointerId !==
-                    touchPointerId
-                ) {
-                    return;
-                }
-
-                event.preventDefault();
-
-                moveTouchBlock(event);
-
-                highlightDropArea(
-                    event.clientX,
-                    event.clientY
+                block.addEventListener(
+                    "pointercancel",
+                    cancel,
+                    { passive: false }
                 );
-            }
+            },
+            { passive: false }
         );
 
-        block.addEventListener(
-            "pointerup",
-            event => {
 
-                if (
-                    !touchDragging ||
-                    event.pointerId !==
-                    touchPointerId
-                ) {
-                    return;
-                }
-
-                finishTouchDrag(event);
-            }
-        );
-
-        block.addEventListener(
-            "pointercancel",
-            () => {
-                cancelTouchDrag();
-            }
-        );
+        return block;
     }
 
 
-    function moveTouchBlock(event) {
+    /* =========================================================
+       DROP ZONE
+    ========================================================= */
 
-        if (!touchBlock) return;
+    function highlightDropZone(
+        x,
+        y
+    ) {
 
-        touchBlock.style.left =
-            `${event.clientX - 25}px`;
-
-        touchBlock.style.top =
-            `${event.clientY - 20}px`;
-    }
-
-
-    function highlightDropArea(x, y) {
+        if (!lessonBlocks) return;
 
         const rect =
             lessonBlocks.getBoundingClientRect();
+
 
         const inside =
             x >= rect.left &&
@@ -1212,54 +1643,81 @@ document.addEventListener("DOMContentLoaded", () => {
             y >= rect.top &&
             y <= rect.bottom;
 
+
+        if (inside) {
+
+            lessonBlocks.style.outline =
+                "4px solid #4c97ff";
+
+            lessonBlocks.style.outlineOffset =
+                "-4px";
+
+        } else {
+
+            lessonBlocks.style.outline =
+                "";
+
+            lessonBlocks.style.outlineOffset =
+                "";
+        }
+    }
+
+
+    function clearDropZone() {
+
+        if (!lessonBlocks) return;
+
         lessonBlocks.style.outline =
-            inside
-                ? "4px solid #4c97ff"
-                : "";
+            "";
 
         lessonBlocks.style.outlineOffset =
-            inside
-                ? "-4px"
-                : "";
+            "";
     }
 
 
-    function finishTouchDrag(event) {
+    /* =========================================================
+       HIGHLIGHT CORRECT BLOCK
+    ========================================================= */
 
-        const rect =
-            lessonBlocks.getBoundingClientRect();
+    function highlightExpectedBlock() {
 
-        const inside =
-            event.clientX >= rect.left &&
-            event.clientX <= rect.right &&
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom;
+        const lesson =
+            lessons[currentMission];
 
-        if (inside && touchData) {
-
-            addBlockToWorkspace(
-                touchData.text,
-                touchData.category
-            );
-        }
-
-        cancelTouchDrag();
-    }
+        const target =
+            lesson.blocks[
+                currentBlockIndex
+            ];
 
 
-    function cancelTouchDrag() {
+        if (!target) return;
 
-        if (touchBlock) {
-            touchBlock.remove();
-        }
 
-        touchBlock = null;
-        touchData = null;
-        touchDragging = false;
-        touchPointerId = null;
+        document
+            .querySelectorAll(
+                "#blockPalette .scratch-block"
+            )
+            .forEach(block => {
 
-        lessonBlocks.style.outline = "";
-        lessonBlocks.style.outlineOffset = "";
+                const match =
+                    normalize(
+                        block.dataset.text
+                    ) ===
+                    normalize(
+                        target.text
+                    );
+
+
+                block.style.outline =
+                    match
+                        ? "3px solid #facc15"
+                        : "";
+
+                block.style.outlineOffset =
+                    match
+                        ? "2px"
+                        : "";
+            });
     }
 
 
@@ -1275,308 +1733,210 @@ document.addEventListener("DOMContentLoaded", () => {
         const lesson =
             lessons[currentMission];
 
-        const expected =
-            lesson.blocks[currentStep];
-
-        // Correct block
-        if (
-            expected &&
-            normalize(text) ===
-            normalize(expected.text)
-        ) {
-
-            const block =
-                createScratchBlock(
-                    text,
-                    category,
-                    true
-                );
-
-            block.classList.add(
-                "workspace-block"
-            );
-
-            lessonBlocks.appendChild(
-                block
-            );
-
-            blockCount.textContent =
-                `${lessonBlocks.children.length} blocks`;
-
-            currentStep++;
-
-            showSuccess(
-                "✅ Correct! Great job."
-            );
-
-            if (
-                currentStep >=
-                lesson.blocks.length
-            ) {
-
-                completeMission();
-
-            } else {
-
-                const next =
-                    lesson.blocks[currentStep];
-
-                lessonStep.textContent =
-                    currentStep + 1;
-
-                workspaceInstruction.textContent =
-                    `👉 Now find and drag: ${next.text}`;
-
-                renderPalette(
-                    next.category
-                );
-            }
-
-        } else {
-
-            showError(
-                `❌ Not that one. Look for: ${expected.text}`
-            );
-
-            highlightExpectedBlock();
-        }
-    }
+        const target =
+            lesson.blocks[
+                currentBlockIndex
+            ];
 
 
-    function normalize(text) {
-
-        return text
-            .toLowerCase()
-            .replace(/\s+/g, " ")
-            .trim();
-    }
+        if (!target) return;
 
 
-    function showSuccess(message) {
+        if (lessonPhase !== 2) {
 
-        workspaceInstruction.textContent =
-            message;
+            workspaceInstruction.textContent =
+                "👀 First press NEXT until the page says DRAG or TAP the highlighted block.";
 
-        workspaceInstruction.style.color =
-            "#16a34a";
-
-        setTimeout(() => {
-
-            workspaceInstruction.style.color =
-                "";
-
-        }, 1200);
-    }
-
-
-    function showError(message) {
-
-        workspaceInstruction.textContent =
-            message;
-
-        workspaceInstruction.style.color =
-            "#dc2626";
-
-        setTimeout(() => {
-
-            workspaceInstruction.style.color =
-                "";
-
-        }, 1800);
-    }
-
-
-    /* =========================================================
-       HIGHLIGHT EXPECTED BLOCK
-    ========================================================= */
-
-    function highlightExpectedBlock() {
-
-        const lesson =
-            lessons[currentMission];
-
-        const expected =
-            lesson?.blocks[currentStep];
-
-        if (!expected) return;
-
-        document
-            .querySelectorAll(
-                "#blockPalette .scratch-block"
-            )
-            .forEach(block => {
-
-                const matches =
-                    normalize(
-                        block.dataset.text
-                    ) ===
-                    normalize(
-                        expected.text
-                    );
-
-                block.style.outline =
-                    matches
-                        ? "3px solid #facc15"
-                        : "";
-
-                block.style.outlineOffset =
-                    matches
-                        ? "2px"
-                        : "";
-            });
-    }
-
-
-    /* =========================================================
-       COMPLETE MISSION
-    ========================================================= */
-
-    function completeMission() {
-
-        if (
-            completedMissions.has(
-                currentMission
-            )
-        ) {
             return;
         }
 
-        completedMissions.add(
-            currentMission
+
+        /* WRONG BLOCK */
+
+        if (
+            normalize(text) !==
+            normalize(target.text)
+        ) {
+
+            workspaceInstruction.textContent =
+                `❌ Not that block. The correct one is: ${target.text}`;
+
+            highlightExpectedBlock();
+
+            return;
+        }
+
+
+        /* CORRECT BLOCK */
+
+        const block =
+            createScratchBlock(
+                text,
+                category,
+                true
+            );
+
+
+        lessonBlocks.appendChild(
+            block
         );
 
-        updateProgress();
+
+        blockCount.textContent =
+            `${lessonBlocks.children.length} block${
+                lessonBlocks.children.length === 1
+                    ? ""
+                    : "s"
+            }`;
+
 
         workspaceInstruction.textContent =
-            "🏆 Mission complete! You learned this Scratch concept.";
+            "✅ Correct! Scratch block added.";
 
-        setTimeout(() => {
+
+        currentBlockIndex++;
+
+
+        /* More blocks needed */
+
+        if (
+            currentBlockIndex <
+            lesson.blocks.length
+        ) {
+
+            lessonPhase =
+                0;
+
+            setTimeout(
+                () => {
+                    renderCurrentPhase();
+                },
+                500
+            );
+
+            return;
+        }
+
+
+        /* Mission finished */
+
+        setTimeout(
+            completeMission,
+            450
+        );
+    }
+
+
+    /* =========================================================
+       NEXT BUTTON
+    ========================================================= */
+
+    nextButton?.addEventListener(
+        "click",
+        () => {
+
+            const lesson =
+                lessons[currentMission];
+
+            if (!lesson) return;
+
+
+            /*
+               LEARN → SEE
+            */
 
             if (
-                completedMissions.size >= 7
+                lessonPhase === 0
             ) {
 
-                showScreen("final");
+                lessonPhase =
+                    1;
 
-            } else {
+                renderCurrentPhase();
 
-                showQuickCheck();
+                return;
             }
 
-        }, 1000);
-    }
+
+            /*
+               SEE → DO
+            */
+
+            if (
+                lessonPhase === 1
+            ) {
+
+                lessonPhase =
+                    2;
+
+                renderCurrentPhase();
+
+                return;
+            }
+
+
+            /*
+               DO → wait for correct block
+            */
+
+            workspaceInstruction.textContent =
+                "🧩 Put the highlighted block into SCRIPTS first.";
+
+            highlightExpectedBlock();
+        }
+    );
 
 
     /* =========================================================
-       PROGRESS
+       SHOW NEXT BLOCK
     ========================================================= */
 
-    function updateProgress() {
+    showBlockButton?.addEventListener(
+        "click",
+        () => {
 
-        const percentage =
-            (completedMissions.size / 7) * 100;
+            const lesson =
+                lessons[currentMission];
 
-        const progress =
-            document.getElementById(
-                "auraProgress"
-            );
+            const target =
+                lesson.blocks[
+                    currentBlockIndex
+                ];
 
-        const counter =
-            document.getElementById(
-                "tutorialAura"
-            );
 
-        if (progress) {
-            progress.style.width =
-                `${percentage}%`;
-        }
+            if (!target) return;
 
-        if (counter) {
-            counter.textContent =
-                `${completedMissions.size} / 7`;
-        }
 
-        document
-            .querySelectorAll(".mission-card")
-            .forEach(card => {
+            lessonPhase =
+                1;
 
-                const mission =
-                    Number(card.dataset.mission);
+            renderCurrentPhase();
 
-                if (
-                    completedMissions.has(
-                        mission
+            highlightExpectedBlock();
+
+
+            const targetBlock =
+                [
+                    ...document.querySelectorAll(
+                        "#blockPalette .scratch-block"
                     )
-                ) {
-
-                    card.classList.add(
-                        "completed"
-                    );
-                }
-            });
-    }
-
-
-    /* =========================================================
-       NEXT BUTTON — FIXED
-    ========================================================= */
-
-    document
-        .getElementById("nextLessonStep")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                const lesson =
-                    lessons[currentMission];
-
-                if (!lesson) return;
-
-                // If all blocks are already done
-                if (
-                    currentStep >=
-                    lesson.blocks.length
-                ) {
-
-                    completeMission();
-
-                    return;
-                }
-
-                const expected =
-                    lesson.blocks[currentStep];
-
-                // Directly teach the next block
-                workspaceInstruction.textContent =
-                    `👉 Find this Scratch block: ${expected.text}`;
-
-                lessonStep.textContent =
-                    currentStep + 1;
-
-                // Automatically open correct category
-                document
-                    .querySelectorAll(
-                        ".block-category"
-                    )
-                    .forEach(button => {
-
-                        button.classList.toggle(
-                            "active",
-                            button.dataset.category ===
-                            expected.category
-                        );
-                    });
-
-                renderPalette(
-                    expected.category
+                ].find(
+                    block =>
+                        normalize(
+                            block.dataset.text
+                        ) ===
+                        normalize(
+                            target.text
+                        )
                 );
 
-                highlightExpectedBlock();
 
-                // Scroll palette to top
-                blockPalette.scrollTop = 0;
-            }
-        );
+            targetBlock?.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest"
+            });
+        }
+    );
 
 
     /* =========================================================
@@ -1595,22 +1955,131 @@ document.addEventListener("DOMContentLoaded", () => {
                         .querySelectorAll(
                             ".block-category"
                         )
-                        .forEach(b =>
-                            b.classList.remove(
-                                "active"
-                            )
+                        .forEach(
+                            b =>
+                                b.classList.remove(
+                                    "active"
+                                )
                         );
+
 
                     button.classList.add(
                         "active"
                     );
 
+
                     renderPalette(
-                        button.dataset.category
+                        button.dataset.category,
+                        false
                     );
                 }
             );
         });
+
+
+    /* =========================================================
+       MISSION COMPLETE
+    ========================================================= */
+
+    function completeMission() {
+
+        if (
+            completedMissions.has(
+                currentMission
+            )
+        ) {
+            return;
+        }
+
+
+        completedMissions.add(
+            currentMission
+        );
+
+
+        updateProgress();
+
+
+        workspaceInstruction.textContent =
+            "🏆 MISSION COMPLETE!";
+
+
+        setTimeout(
+            () => {
+
+                if (
+                    completedMissions.size >= 7
+                ) {
+
+                    showScreen("final");
+
+                } else {
+
+                    showQuickCheck();
+                }
+
+            },
+            650
+        );
+    }
+
+
+    /* =========================================================
+       PROGRESS
+    ========================================================= */
+
+    function updateProgress() {
+
+        const percentage =
+            (
+                completedMissions.size /
+                7
+            ) * 100;
+
+
+        const progress =
+            document.getElementById(
+                "auraProgress"
+            );
+
+        const counter =
+            document.getElementById(
+                "tutorialAura"
+            );
+
+
+        if (progress) {
+            progress.style.width =
+                `${percentage}%`;
+        }
+
+
+        if (counter) {
+            counter.textContent =
+                `${completedMissions.size} / 7`;
+        }
+
+
+        document
+            .querySelectorAll(
+                ".mission-card"
+            )
+            .forEach(card => {
+
+                const mission =
+                    Number(
+                        card.dataset.mission
+                    );
+
+
+                card.classList.toggle(
+                    "completed",
+                    completedMissions.has(
+                        mission
+                    )
+                );
+            });
+    }
 
 
     /* =========================================================
@@ -1632,73 +2101,116 @@ document.addEventListener("DOMContentLoaded", () => {
                 ...lessonBlocks.children
             ];
 
-        if (!blocks.length) {
-
-            showError(
-                "🧩 Drag a Scratch block into the workspace first."
-            );
-
-            return;
-        }
-
         const preview =
             document.getElementById(
                 "previewPlayer"
             );
 
-        if (!preview) return;
 
-        let delay = 0;
+        if (
+            !blocks.length ||
+            !preview
+        ) {
 
-        blocks.forEach(block => {
+            workspaceInstruction.textContent =
+                "🧩 Add a Scratch block first.";
 
-            const action =
-                getAction(
-                    block.textContent
+            return;
+        }
+
+
+        preview.style.left =
+            "50%";
+
+        preview.style.top =
+            "50%";
+
+        preview.style.transform =
+            "translate(-50%, -50%)";
+
+
+        blocks.forEach(
+            (block, i) => {
+
+                setTimeout(
+                    () => {
+
+                        executeAction(
+                            getAction(
+                                block.textContent
+                            ),
+                            preview
+                        );
+
+                    },
+                    i * 600
                 );
-
-            setTimeout(() => {
-
-                executeAction(
-                    action,
-                    preview
-                );
-
-            }, delay);
-
-            delay += 650;
-        });
+            }
+        );
     }
 
 
     function getAction(text) {
 
-        const lower =
+        const t =
             text.toLowerCase();
 
-        if (lower.includes("move"))
-            return "move";
 
-        if (lower.includes("change x"))
+        if (
+            t.includes("change x")
+        ) {
             return "x";
+        }
 
-        if (lower.includes("change y"))
+
+        if (
+            t.includes("change y")
+        ) {
             return "y";
+        }
 
-        if (lower.includes("turn"))
+
+        if (
+            t.includes("move")
+        ) {
+            return "move";
+        }
+
+
+        if (
+            t.includes("turn")
+        ) {
             return "turn";
+        }
 
-        if (lower.includes("costume"))
+
+        if (
+            t.includes("costume")
+        ) {
             return "costume";
+        }
 
-        if (lower.includes("say"))
-            return "say";
 
-        if (lower.includes("sound"))
-            return "sound";
-
-        if (lower.includes("backdrop"))
+        if (
+            t.includes("backdrop")
+        ) {
             return "backdrop";
+        }
+
+
+        if (
+            t.includes("sound")
+        ) {
+            return "sound";
+        }
+
+
+        if (
+            t.includes("say")
+        ) {
+            return "say";
+        }
+
 
         return "none";
     }
@@ -1713,17 +2225,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             case "move":
 
-                preview.style.left =
-                    "65%";
-
-                break;
-
             case "x":
 
                 preview.style.left =
                     "70%";
 
                 break;
+
 
             case "y":
 
@@ -1732,12 +2240,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 break;
 
+
             case "turn":
 
                 preview.style.transform =
                     "translate(-50%, -50%) rotate(25deg)";
 
                 break;
+
 
             case "costume":
 
@@ -1748,23 +2258,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 break;
 
+
             case "say":
 
                 showBubble(
                     "Hello!",
-                    preview
+                    "previewStage"
                 );
 
                 break;
+
 
             case "sound":
 
                 showBubble(
                     "🔊 Meow!",
-                    preview
+                    "previewStage"
                 );
 
                 break;
+
 
             case "backdrop":
 
@@ -1781,63 +2294,94 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+    /* =========================================================
+       SPEECH BUBBLE
+    ========================================================= */
+
     function showBubble(
         text,
-        preview
+        stageId
     ) {
 
         const stage =
             document.getElementById(
-                "previewStage"
+                stageId
             );
+
 
         if (!stage) return;
 
+
+        const old =
+            stage.querySelector(
+                ".js-bubble"
+            );
+
+
+        old?.remove();
+
+
         const bubble =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
-        bubble.textContent = text;
 
-        bubble.style.position =
-            "absolute";
+        bubble.className =
+            "js-bubble";
 
-        bubble.style.left =
-            "52%";
+        bubble.textContent =
+            text;
 
-        bubble.style.top =
-            "25%";
 
-        bubble.style.padding =
-            "7px 10px";
+        Object.assign(
+            bubble.style,
+            {
+                position:
+                    "absolute",
 
-        bubble.style.background =
-            "white";
+                left:
+                    "52%",
 
-        bubble.style.color =
-            "#111827";
+                top:
+                    "25%",
 
-        bubble.style.borderRadius =
-            "10px";
+                padding:
+                    "7px 10px",
 
-        bubble.style.fontSize =
-            "11px";
+                background:
+                    "white",
 
-        bubble.style.fontWeight =
-            "700";
+                color:
+                    "#111827",
 
-        bubble.style.zIndex =
-            "50";
+                borderRadius:
+                    "10px",
 
-        bubble.style.boxShadow =
-            "0 3px 12px rgba(0,0,0,.2)";
+                fontSize:
+                    "11px",
+
+                fontWeight:
+                    "700",
+
+                zIndex:
+                    "50",
+
+                boxShadow:
+                    "0 3px 12px rgba(0,0,0,.2)"
+            }
+        );
+
 
         stage.appendChild(
             bubble
         );
 
-        setTimeout(() => {
-            bubble.remove();
-        }, 1200);
+
+        setTimeout(
+            () => bubble.remove(),
+            1200
+        );
     }
 
 
@@ -1866,60 +2410,98 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     const checkOptions =
-        document.querySelectorAll(
-            ".check-option"
-        );
+        [
+            ...document.querySelectorAll(
+                ".check-option"
+            )
+        ];
+
+
+    const checks = [
+
+        {
+            block:
+                "move 10 steps",
+
+            category:
+                "motion",
+
+            answer:
+                "Motion"
+        },
+
+        {
+            block:
+                "say [Hello!]",
+
+            category:
+                "looks",
+
+            answer:
+                "Looks"
+        },
+
+        {
+            block:
+                "start sound [Meow]",
+
+            category:
+                "sound",
+
+            answer:
+                "Sound"
+        },
+
+        {
+            block:
+                "when green flag clicked",
+
+            category:
+                "events",
+
+            answer:
+                "Events"
+        },
+
+        {
+            block:
+                "forever",
+
+            category:
+                "control",
+
+            answer:
+                "Control"
+        },
+
+        {
+            block:
+                "touching [mouse-pointer]?",
+
+            category:
+                "sensing",
+
+            answer:
+                "Sensing"
+        },
+
+        {
+            block:
+                "pick random 1 to 10",
+
+            category:
+                "operators",
+
+            answer:
+                "Operators"
+        }
+    ];
 
 
     function showQuickCheck() {
 
         if (!quickCheck) return;
 
-        const checks = [
-
-            {
-                block: "move 10 steps",
-                category: "motion",
-                answer: "Motion"
-            },
-
-            {
-                block: "say [Hello!]",
-                category: "looks",
-                answer: "Looks"
-            },
-
-            {
-                block: "start sound [Meow]",
-                category: "sound",
-                answer: "Sound"
-            },
-
-            {
-                block: "when green flag clicked",
-                category: "events",
-                answer: "Events"
-            },
-
-            {
-                block: "forever",
-                category: "control",
-                answer: "Control"
-            },
-
-            {
-                block: "touching [mouse-pointer]?",
-                category: "sensing",
-                answer: "Sensing"
-            },
-
-            {
-                block: "pick random 1 to 10",
-                category: "operators",
-                answer: "Operators"
-            }
-
-        ];
 
         const selected =
             checks[
@@ -1929,10 +2511,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 )
             ];
 
+
         checkQuestion.textContent =
             "Which Scratch category contains this block?";
 
-        checkBlock.innerHTML = "";
+
+        checkBlock.innerHTML =
+            "";
+
 
         checkBlock.appendChild(
             createScratchBlock(
@@ -1942,75 +2528,108 @@ document.addEventListener("DOMContentLoaded", () => {
             )
         );
 
-        checkResult.textContent = "";
 
-        // RANDOMIZE ANSWER POSITIONS
-        const answers = [
+        checkResult.textContent =
+            "";
+
+
+        const allCategories = [
+
             "Motion",
             "Looks",
             "Sound",
-            "Events"
+            "Events",
+            "Control",
+            "Sensing",
+            "Operators",
+            "Variables"
+
         ];
 
-        if (
-            !answers.includes(
-                selected.answer
-            )
-        ) {
-            answers[
-                Math.floor(
-                    Math.random() *
-                    answers.length
-                )
-            ] = selected.answer;
-        }
 
-        answers.sort(
-            () => Math.random() - 0.5
-        );
+        const distractors =
+            allCategories
+                .filter(
+                    category =>
+                        category !==
+                        selected.answer
+                )
+                .sort(
+                    () =>
+                        Math.random() -
+                        0.5
+                )
+                .slice(
+                    0,
+                    3
+                );
+
+
+        const answers =
+            [
+                selected.answer,
+                ...distractors
+            ].sort(
+                () =>
+                    Math.random() -
+                    0.5
+            );
+
 
         checkOptions.forEach(
-            (button, index) => {
+            (button, i) => {
 
                 button.textContent =
-                    answers[index] || "";
+                    answers[i] || "";
 
-                button.onclick = () => {
+                button.style.display =
+                    answers[i]
+                        ? ""
+                        : "none";
 
-                    if (
-                        button.textContent ===
-                        selected.answer
-                    ) {
 
-                        checkResult.textContent =
-                            "✅ Correct!";
+                button.onclick =
+                    () => {
 
-                        checkResult.style.color =
-                            "#16a34a";
+                        if (
+                            button.textContent ===
+                            selected.answer
+                        ) {
 
-                        setTimeout(() => {
+                            checkResult.textContent =
+                                "✅ Correct!";
 
-                            quickCheck.classList.add(
-                                "hidden"
+                            checkResult.style.color =
+                                "#16a34a";
+
+
+                            setTimeout(
+                                () => {
+
+                                    quickCheck.classList.add(
+                                        "hidden"
+                                    );
+
+                                    quickCheck.classList.remove(
+                                        "active"
+                                    );
+
+                                },
+                                650
                             );
 
-                            quickCheck.classList.remove(
-                                "active"
-                            );
+                        } else {
 
-                        }, 700);
+                            checkResult.textContent =
+                                `💡 Hint: ${selected.block} is in ${selected.answer}.`;
 
-                    } else {
-
-                        checkResult.textContent =
-                            `💡 Hint: ${selected.block} belongs to ${selected.answer}.`;
-
-                        checkResult.style.color =
-                            "#dc2626";
-                    }
-                };
+                            checkResult.style.color =
+                                "#dc2626";
+                        }
+                    };
             }
         );
+
 
         quickCheck.classList.remove(
             "hidden"
@@ -2023,30 +2642,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================================
-       BACK TO MISSIONS
+       NAVIGATION
     ========================================================= */
 
     document
-        .getElementById(
-            "backToMissions"
-        )
+        .getElementById("backToMissions")
         ?.addEventListener(
             "click",
             () => {
 
-                showScreen("tutorial");
+                showScreen(
+                    "tutorial"
+                );
             }
         );
 
 
-    /* =========================================================
-       REPLAY
-    ========================================================= */
-
     document
-        .getElementById(
-            "replayButton"
-        )
+        .getElementById("replayButton")
         ?.addEventListener(
             "click",
             () => {
@@ -2055,16 +2668,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 updateProgress();
 
-                showScreen("tutorial");
+                showScreen(
+                    "tutorial"
+                );
             }
         );
 
 
     /* =========================================================
-       INITIALIZE
+       INITIAL STATE
     ========================================================= */
 
-    renderPalette("motion");
     updateProgress();
 
     showScreen("intro");
