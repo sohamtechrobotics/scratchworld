@@ -2604,20 +2604,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                             setTimeout(
-                                () => {
+    () => {
 
-                                    quickCheck.classList.add(
-                                        "hidden"
-                                    );
+        quickCheck.classList.add(
+            "hidden"
+        );
 
-                                    quickCheck.classList.remove(
-                                        "active"
-                                    );
+        quickCheck.classList.remove(
+            "active"
+        );
 
-                                },
-                                650
-                            );
+        // Go back to Mission Map
+        showScreen("tutorial");
 
+        // Highlight next mission
+        const nextMission =
+            currentMission + 1;
+
+        if (nextMission <= 7) {
+
+            const nextCard =
+                document.querySelector(
+                    `.mission-card[data-mission="${nextMission}"]`
+                );
+
+            if (nextCard) {
+
+                nextCard.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
+
+                nextCard.classList.add(
+                    "next-mission"
+                );
+
+                setTimeout(
+                    () => {
+                        nextCard.classList.remove(
+                            "next-mission"
+                        );
+                    },
+                    1800
+                );
+            }
+        }
+
+    },
+    650
+);
                         } else {
 
                             checkResult.textContent =
