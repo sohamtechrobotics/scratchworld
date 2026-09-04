@@ -2737,3 +2737,142 @@ select:focus-visible{
         margin-bottom: 10px !important;
     }
 }
+
+/* =========================================================
+   FINAL RIGHT PANEL FIX
+   ========================================================= */
+
+.scratch-right-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 8px !important;
+    gap: 5px !important;
+}
+
+/* STAGE */
+.scratch-stage {
+    width: 100% !important;
+    height: 155px !important;
+    min-height: 155px !important;
+    flex-shrink: 0 !important;
+}
+
+/* SPRITE LIST */
+.sprite-list {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+}
+
+/* SPRITE CARDS */
+.sprite-card {
+    min-height: 42px !important;
+    padding: 4px !important;
+}
+
+/* COSTUME / SOUND SECTION */
+.asset-section {
+    display: block !important;
+    width: 100% !important;
+    min-height: 90px !important;
+    flex-shrink: 0 !important;
+    margin: 2px 0 !important;
+}
+
+/* COSTUME TABS */
+.asset-tabs {
+    display: flex !important;
+    width: 100% !important;
+    height: 27px !important;
+}
+
+.asset-tab {
+    flex: 1 !important;
+    font-size: 8px !important;
+}
+
+/* ASSET LIBRARY */
+#assetLibrary {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 5px !important;
+
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+
+    padding: 4px !important;
+}
+
+/* COSTUME BOXES */
+.asset-item {
+    flex: 0 0 42px !important;
+
+    width: 42px !important;
+    height: 42px !important;
+
+    display: grid !important;
+    place-items: center !important;
+
+    padding: 0 !important;
+    border-radius: 7px !important;
+}
+
+/* CHOOSE COSTUME */
+#chooseCostumeButton {
+    height: 21px !important;
+    min-height: 21px !important;
+    margin-top: 3px !important;
+    padding: 2px !important;
+    font-size: 7px !important;
+}
+
+/* BACKDROPS */
+.backdrop-section {
+    flex-shrink: 0 !important;
+}
+
+.backdrop-library {
+    display: flex !important;
+    gap: 5px !important;
+    overflow-x: auto !important;
+}
+
+.backdrop-card {
+    flex: 0 0 55px !important;
+}
+
+/* REMOVE EXCESS SPACE */
+.scratch-right-panel > * {
+    margin-bottom: 0 !important;
+}
+
+/* DESKTOP */
+@media (min-width: 1000px) {
+
+    .scratch-stage {
+        height: 145px !important;
+        min-height: 145px !important;
+    }
+
+    .asset-section {
+        min-height: 88px !important;
+    }
+
+    #assetLibrary {
+        height: 45px !important;
+        min-height: 45px !important;
+        max-height: 45px !important;
+    }
+}
