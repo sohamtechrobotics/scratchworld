@@ -1,13 +1,13 @@
-/* =========================================================
-   AURA PLUS — SCRATCH GAME LAB
-   FINAL SCRIPT
-   PART 1 / 3
-   ========================================================= */
-
 "use strict";
 
 /* =========================================================
-   BASIC HELPERS
+   AURA PLUS — COMPLETE SCRIPT
+   Matches current index.html
+   ========================================================= */
+
+
+/* =========================================================
+   HELPERS
    ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -18,6 +18,35 @@ const $$ = selector =>
 const qs = selector =>
     document.querySelector(selector);
 
+function capitalize(text) {
+    if (!text) return "";
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+
+/* =========================================================
+   SCREEN NAVIGATION
+   ========================================================= */
+
+function showScreen(id) {
+
+    $$(".screen").forEach(screen => {
+        screen.classList.add("hidden");
+        screen.classList.remove("active");
+    });
+
+    const screen = $(id);
+
+    if (!screen) return;
+
+    screen.classList.remove("hidden");
+    screen.classList.add("active");
+}
+
 
 /* =========================================================
    GLOBAL STATE
@@ -26,115 +55,137 @@ const qs = selector =>
 let currentMission = 1;
 let currentStep = 0;
 
+/*
+   IMPORTANT:
+   Nothing is selected automatically when a lesson opens.
+*/
+
 let selectedSprite = null;
+
 let selectedCategory = "motion";
-let selectedAsset = null;
+
 let selectedAssetType = "costumes";
+
+let selectedAsset = null;
+
 let selectedBackdrop = "space";
 
 let currentEditorTab = "code";
 
-/*
-   IMPORTANT:
-   Every sprite has its OWN workspace.
-   This fixes the original problem where
-   AURA's code appeared when SHADOW was selected.
-*/
 
-const spriteWorkspaces = {
-    aura: [],
-    shadow: [],
-    orb: [],
-    portal: [],
-    star: [],
-    stage: []
+/* =========================================================
+   SEPARATE SCRIPT FOR EVERY SPRITE
+   ========================================================= */
+
+const scriptWorkspaces = {
+    Aura: [],
+    Shadow: [],
+    Orb: [],
+    Portal: [],
+    Star: [],
+    Stage: []
 };
 
 let workspaceBlocks = [];
 
+
+/* =========================================================
+   UNDO / REDO
+   ========================================================= */
+
 let undoStack = [];
 let redoStack = [];
 
+
+/* =========================================================
+   LESSON RUN STATE
+   ========================================================= */
+
 let lastRunCompleted = false;
 let lessonRunning = false;
-let lessonTimer = null;
+let lessonRunTimer = null;
 
 
 /* =========================================================
-   GAME STATE
+   MISSION PROGRESS
    ========================================================= */
 
-let gameRunning = false;
-let gameAnimation = null;
-let lastHit = 0;
+let completedMissions = [];
 
-let auraGame = {
-    x: 12,
-    y: 50,
-    score: 0,
-    lives: 3,
-    collected: 0,
-    shadowX: 72,
-    shadowY: 50
-};
+try {
+    completedMissions =
+        JSON.parse(
+            localStorage.getItem("auraPlusMissions") || "[]"
+        );
+} catch {
+    completedMissions = [];
+}
 
 
 /* =========================================================
-   COMPLETED MISSIONS
+   BLOCK DEFINITIONS
    ========================================================= */
 
-let completedMissions =
-    JSON.parse(
-        localStorage.getItem("auraPlusMissions") || "[]"
-    );
-
-
-/* =========================================================
-   SCRATCH BLOCK DEFINITIONS
-   ========================================================= */
-
-const scratchBlocks = {
+const blocks = {
 
     motion: [
         {
             id: "move",
             text: "move 10 steps",
-            color: "motion"
-        },
-        {
-            id: "changex",
-            text: "change x by 10",
-            color: "motion"
-        },
-        {
-            id: "changey",
-            text: "change y by 10",
-            color: "motion"
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
         },
         {
             id: "turn",
             text: "turn 15 degrees",
-            color: "motion"
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "15" }
+            ]
         },
         {
             id: "random",
             text: "go to random position",
-            color: "motion"
+            className: "block-motion"
+        },
+        {
+            id: "changex",
+            text: "change x by 10",
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
+        },
+        {
+            id: "changey",
+            text: "change y by 10",
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
         },
         {
             id: "setx",
             text: "set x to 0",
-            color: "motion"
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "0" }
+            ]
         },
         {
             id: "sety",
             text: "set y to 0",
-            color: "motion"
+            className: "block-motion",
+            inputs: [
+                { type: "number", value: "0" }
+            ]
         },
         {
             id: "bounce",
             text: "if on edge, bounce",
-            color: "motion"
+            className: "block-motion"
         }
     ],
 
@@ -142,22 +193,37 @@ const scratchBlocks = {
         {
             id: "say",
             text: "say Hello! for 2 seconds",
-            color: "looks"
+            className: "block-looks",
+            inputs: [
+                { type: "text", value: "Hello!" },
+                { type: "number", value: "2" }
+            ]
         },
         {
-            id: "nextcostume",
-            text: "next costume",
-            color: "looks"
+            id: "sayforever",
+            text: "say Hello!",
+            className: "block-looks",
+            inputs: [
+                { type: "text", value: "Hello!" }
+            ]
         },
         {
             id: "costume",
             text: "switch costume to costume1",
-            color: "looks"
+            className: "block-looks"
+        },
+        {
+            id: "nextcostume",
+            text: "next costume",
+            className: "block-looks"
         },
         {
             id: "size",
             text: "change size by 10",
-            color: "looks"
+            className: "block-looks",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
         }
     ],
 
@@ -165,12 +231,20 @@ const scratchBlocks = {
         {
             id: "soundstart",
             text: "start sound Meow",
-            color: "sound"
+            className: "block-sound"
         },
         {
             id: "soundwait",
             text: "play sound Meow until done",
-            color: "sound"
+            className: "block-sound"
+        },
+        {
+            id: "volume",
+            text: "change volume by -10",
+            className: "block-sound",
+            inputs: [
+                { type: "number", value: "-10" }
+            ]
         }
     ],
 
@@ -178,22 +252,27 @@ const scratchBlocks = {
         {
             id: "flag",
             text: "when green flag clicked",
-            color: "events"
+            className: "block-events"
         },
         {
             id: "spriteclick",
             text: "when this sprite clicked",
-            color: "events"
+            className: "block-events"
         },
         {
             id: "space",
             text: "when space key pressed",
-            color: "events"
+            className: "block-events"
+        },
+        {
+            id: "receive",
+            text: "when I receive message1",
+            className: "block-events"
         },
         {
             id: "broadcast",
             text: "broadcast message1",
-            color: "events"
+            className: "block-events"
         }
     ],
 
@@ -201,32 +280,38 @@ const scratchBlocks = {
         {
             id: "wait",
             text: "wait 1 seconds",
-            color: "control"
+            className: "block-control",
+            inputs: [
+                { type: "number", value: "1" }
+            ]
         },
         {
             id: "repeat",
             text: "repeat 10",
-            color: "control"
+            className: "block-control",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
         },
         {
             id: "forever",
             text: "forever",
-            color: "control"
+            className: "block-control"
         },
         {
             id: "if",
             text: "if then",
-            color: "control"
+            className: "block-control"
         },
         {
             id: "ifelse",
             text: "if then else",
-            color: "control"
+            className: "block-control"
         },
         {
             id: "stop",
             text: "stop all",
-            color: "control"
+            className: "block-control"
         }
     ],
 
@@ -234,22 +319,27 @@ const scratchBlocks = {
         {
             id: "touching",
             text: "touching mouse-pointer?",
-            color: "sensing"
+            className: "block-sensing"
         },
         {
             id: "touchingorb",
             text: "touching Orb?",
-            color: "sensing"
+            className: "block-sensing"
+        },
+        {
+            id: "ask",
+            text: "ask What's your name? and wait",
+            className: "block-sensing"
         },
         {
             id: "key",
             text: "key space pressed?",
-            color: "sensing"
+            className: "block-sensing"
         },
         {
             id: "mouse",
             text: "mouse down?",
-            color: "sensing"
+            className: "block-sensing"
         }
     ],
 
@@ -257,22 +347,27 @@ const scratchBlocks = {
         {
             id: "add",
             text: "1 + 1",
-            color: "operators"
+            className: "block-operators"
         },
         {
             id: "greater",
             text: "1 > 1",
-            color: "operators"
+            className: "block-operators"
         },
         {
             id: "equals",
             text: "1 = 1",
-            color: "operators"
+            className: "block-operators"
         },
         {
             id: "randomnumber",
             text: "pick random 1 to 10",
-            color: "operators"
+            className: "block-operators"
+        },
+        {
+            id: "join",
+            text: "join hello world",
+            className: "block-operators"
         }
     ],
 
@@ -280,17 +375,28 @@ const scratchBlocks = {
         {
             id: "setvar",
             text: "set Score to 0",
-            color: "variables"
+            className: "block-variables",
+            inputs: [
+                { type: "number", value: "0" }
+            ]
         },
         {
             id: "changevar",
             text: "change Score by 10",
-            color: "variables"
+            className: "block-variables",
+            inputs: [
+                { type: "number", value: "10" }
+            ]
         },
         {
             id: "showvar",
             text: "show variable Score",
-            color: "variables"
+            className: "block-variables"
+        },
+        {
+            id: "hidevar",
+            text: "hide variable Score",
+            className: "block-variables"
         }
     ],
 
@@ -298,24 +404,24 @@ const scratchBlocks = {
         {
             id: "define",
             text: "define my block",
-            color: "myblocks"
+            className: "block-myblocks"
         },
         {
             id: "custom",
             text: "my block",
-            color: "myblocks"
+            className: "block-myblocks"
         }
     ]
 };
 
 
 /* =========================================================
-   SPRITE ASSETS
+   ASSETS
    ========================================================= */
 
 const spriteAssets = {
 
-    aura: {
+    Aura: {
         costumes: [
             "AURA",
             "AURA GLOW",
@@ -328,7 +434,7 @@ const spriteAssets = {
         ]
     },
 
-    shadow: {
+    Shadow: {
         costumes: [
             "Shadow",
             "Shadow Attack"
@@ -339,7 +445,7 @@ const spriteAssets = {
         ]
     },
 
-    orb: {
+    Orb: {
         costumes: [
             "Orb",
             "Orb Glow"
@@ -350,7 +456,7 @@ const spriteAssets = {
         ]
     },
 
-    portal: {
+    Portal: {
         costumes: [
             "Portal",
             "Portal Open"
@@ -361,7 +467,7 @@ const spriteAssets = {
         ]
     },
 
-    star: {
+    Star: {
         costumes: [
             "Star"
         ],
@@ -373,24 +479,27 @@ const spriteAssets = {
 
 
 /* =========================================================
-   BACKDROPS
+   BACKDROP DATA
    ========================================================= */
 
 const backdropData = {
 
     space:
-        "radial-gradient(circle at 50% 40%, #172554, #07101e 75%)",
+        "radial-gradient(circle at 50% 45%, #172554, #07101e 75%)",
 
     neon:
         "linear-gradient(135deg,#7c3aed,#0891b2)",
 
     city:
-        "linear-gradient(180deg,#38bdf8 0 50%,#334155 50%)"
+        "linear-gradient(180deg,#38bdf8 0 50%,#334155 50%)",
+
+    sunset:
+        "linear-gradient(180deg,#f97316,#7c3aed,#111827)"
 };
 
 
 /* =========================================================
-   LESSON DATA
+   LESSONS
    ========================================================= */
 
 const lessons = {
@@ -428,7 +537,7 @@ const lessons = {
                 title: "Select SHADOW",
 
                 action:
-                    "Click SHADOW in the Sprite List.",
+                    "Click the SHADOW sprite.",
 
                 target:
                     "sprite-shadow"
@@ -449,10 +558,10 @@ const lessons = {
 
     2: {
 
-        title: "Make AURA Move",
+        title: "Make a Sprite Move",
 
         description:
-            "Use Motion blocks to control position.",
+            "Use Motion blocks to control movement.",
 
         steps: [
 
@@ -460,7 +569,7 @@ const lessons = {
                 title: "Start the script",
 
                 action:
-                    "Open Events and click 'when green flag clicked'.",
+                    "Click Events, then click 'when green flag clicked'.",
 
                 category:
                     "events",
@@ -473,7 +582,7 @@ const lessons = {
                 title: "Move AURA",
 
                 action:
-                    "Open Motion and click 'move 10 steps'.",
+                    "Click Motion, then click 'move 10 steps'.",
 
                 category:
                     "motion",
@@ -528,23 +637,23 @@ const lessons = {
             },
 
             {
-                title: "Choose AURA GLOW",
+                title: "Choose a costume",
 
                 action:
-                    "Click AURA GLOW in the costume library.",
+                    "Click a costume in the costume library.",
 
                 asset:
-                    "costume",
-
-                assetName:
-                    "AURA GLOW"
+                    "costume"
             },
 
             {
-                title: "Add next costume",
+                title: "Return to Code",
 
                 action:
-                    "Return to Code → Looks and click 'next costume'.",
+                    "Click Code, then Looks, then 'next costume'.",
+
+                tab:
+                    "code",
 
                 category:
                     "looks",
@@ -554,7 +663,7 @@ const lessons = {
             },
 
             {
-                title: "Test it",
+                title: "Run it",
 
                 action:
                     "Click the green flag.",
@@ -571,7 +680,7 @@ const lessons = {
         title: "Program Two Sprites",
 
         description:
-            "Each sprite can have its own script.",
+            "Different sprites can have different scripts.",
 
         steps: [
 
@@ -579,7 +688,7 @@ const lessons = {
                 title: "Select AURA",
 
                 action:
-                    "Click AURA.",
+                    "Click AURA in the Sprite List.",
 
                 target:
                     "sprite-aura"
@@ -602,7 +711,7 @@ const lessons = {
                 title: "Select SHADOW",
 
                 action:
-                    "Click SHADOW.",
+                    "Click SHADOW in the Sprite List.",
 
                 target:
                     "sprite-shadow"
@@ -626,10 +735,10 @@ const lessons = {
 
     5: {
 
-        title: "Change Backdrop",
+        title: "Change the Backdrop",
 
         description:
-            "Backdrops create the world of the project.",
+            "Backdrops create the world of your project.",
 
         steps: [
 
@@ -664,7 +773,7 @@ const lessons = {
             },
 
             {
-                title: "Test it",
+                title: "Test the Stage",
 
                 action:
                     "Click the green flag.",
@@ -696,23 +805,23 @@ const lessons = {
             },
 
             {
-                title: "Choose Meow",
+                title: "Choose a sound",
 
                 action:
-                    "Click the Meow sound.",
+                    "Click a sound in the sound library.",
 
                 asset:
-                    "sound",
-
-                assetName:
-                    "Meow"
+                    "sound"
             },
 
             {
                 title: "Add the sound block",
 
                 action:
-                    "Return to Code → Sound and click 'start sound Meow'.",
+                    "Click Code, then Sound, then 'start sound Meow'.",
+
+                tab:
+                    "code",
 
                 category:
                     "sound",
@@ -722,7 +831,7 @@ const lessons = {
             },
 
             {
-                title: "Test it",
+                title: "Test the sound",
 
                 action:
                     "Click the green flag.",
@@ -739,22 +848,35 @@ const lessons = {
         title: "Build AURA PLUS",
 
         description:
-            "Combine Scratch ideas to understand how a real game works.",
+            "Combine Scratch ideas to understand the actual AURA PLUS game.",
 
         steps: [
 
             {
-                title: "Start the game",
+                title: "Start the game script",
 
                 action:
-                    "Select AURA and open Events.",
+                    "Select AURA, open Events and click 'when green flag clicked'.",
 
                 target:
                     "sprite-aura"
             },
 
             {
-                title: "Add movement",
+                title: "Add the event block",
+
+                action:
+                    "Open Events and click 'when green flag clicked'.",
+
+                category:
+                    "events",
+
+                block:
+                    "flag"
+            },
+
+            {
+                title: "Move AURA",
 
                 action:
                     "Open Motion and click 'change x by 10'.",
@@ -856,101 +978,21 @@ const lessons = {
 
 
 /* =========================================================
-   SCREEN NAVIGATION
+   SPRITE WORKSPACE MANAGEMENT
    ========================================================= */
 
-function showScreen(screenId) {
-
-    $$(".screen").forEach(screen => {
-
-        screen.classList.add("hidden");
-
-        screen.classList.remove("active");
-    });
-
-    const screen = $(screenId);
-
-    if (!screen) return;
-
-    screen.classList.remove("hidden");
-
-    screen.classList.add("active");
-}
-
-
-/* =========================================================
-   OPEN MISSION
-   ========================================================= */
-
-function openMission(mission) {
-
-    if (!lessons[mission]) return;
-
-    currentMission = mission;
-
-    currentStep = 0;
-
-    selectedSprite = null;
-
-    selectedCategory = "motion";
-
-    selectedAsset = null;
-
-    selectedAssetType = "costumes";
-
-    selectedBackdrop = "space";
-
-    currentEditorTab = "code";
-
-    lastRunCompleted = false;
-
-    /*
-       Completely reset all individual scripts.
-    */
-
-    Object.keys(spriteWorkspaces).forEach(sprite => {
-
-        spriteWorkspaces[sprite] = [];
-    });
-
-    workspaceBlocks = [];
-
-    undoStack.length = 0;
-
-    redoStack.length = 0;
-
-    showScreen("lessonScreen");
-
-    renderPalette();
-
-    renderWorkspace();
-
-    renderAssets();
-
-    renderBackdrops();
-
-    renderLessonStep();
-
-    updateMissionProgress();
-}
-
-
-/* =========================================================
-   SAVE / LOAD INDIVIDUAL SPRITE SCRIPT
-   ========================================================= */
-
-function saveCurrentSpriteScript() {
+function saveCurrentSpriteWorkspace() {
 
     if (!selectedSprite) return;
 
-    spriteWorkspaces[selectedSprite] =
+    scriptWorkspaces[selectedSprite] =
         JSON.parse(
             JSON.stringify(workspaceBlocks)
         );
 }
 
 
-function loadSpriteScript(sprite) {
+function loadSpriteWorkspace(sprite) {
 
     if (!sprite) {
 
@@ -962,33 +1004,23 @@ function loadSpriteScript(sprite) {
     workspaceBlocks =
         JSON.parse(
             JSON.stringify(
-                spriteWorkspaces[sprite] || []
+                scriptWorkspaces[sprite] || []
             )
         );
 }
 
 
 /* =========================================================
-   SELECT SPRITE
+   SPRITE SELECTION
    ========================================================= */
 
 function selectSprite(sprite) {
 
-    /*
-       FIRST save the script belonging to
-       the sprite we were previously editing.
-    */
-
-    saveCurrentSpriteScript();
+    saveCurrentSpriteWorkspace();
 
     selectedSprite = sprite;
 
-    /*
-       NOW load the newly selected sprite's
-       own script.
-    */
-
-    loadSpriteScript(sprite);
+    loadSpriteWorkspace(sprite);
 
     updateSpriteSelection();
 
@@ -996,93 +1028,10 @@ function selectSprite(sprite) {
 
     renderAssets();
 
-    updateStageSprite();
-
     clearHighlights();
 
     $("stepStatus").textContent =
-        `✓ ${capitalize(sprite)} selected. Its own script is shown.`;
-}
-
-
-/* =========================================================
-   SPRITE UI
-   ========================================================= */
-
-function setupSprites() {
-
-    $$(".sprite-card").forEach(card => {
-
-        card.addEventListener("click", () => {
-
-            selectSprite(
-                card.dataset.sprite
-            );
-
-        });
-
-    });
-
-
-    $("chooseSpriteButton")
-        ?.addEventListener(
-            "click",
-            addStarSprite
-        );
-}
-
-
-function addStarSprite() {
-
-    if (
-        qs(
-            '.sprite-card[data-sprite="star"]'
-        )
-    ) {
-
-        $("stepStatus").textContent =
-            "Star is already in the Sprite List.";
-
-        return;
-    }
-
-    const list = $("spriteList");
-
-    if (!list) return;
-
-    const card =
-        document.createElement("button");
-
-    card.className =
-        "sprite-card";
-
-    card.dataset.sprite =
-        "star";
-
-    card.innerHTML = `
-        <span class="sprite-thumb">
-            ★
-        </span>
-
-        <span>
-            <b>Star</b>
-            <small>Sprite</small>
-        </span>
-    `;
-
-    card.addEventListener(
-        "click",
-        () => selectSprite("star")
-    );
-
-    list.appendChild(card);
-
-    spriteWorkspaces.star = [];
-
-    $("stepStatus").textContent =
-        "✓ New Star sprite added.";
-
-    clearHighlights();
+        `✓ ${sprite} selected. Its own script is shown.`;
 }
 
 
@@ -1097,16 +1046,110 @@ function updateSpriteSelection() {
 
     });
 
-    const label =
-        $("activeSpriteLabel");
+    $("selectedTarget").textContent =
+        selectedSprite || "No sprite selected";
 
-    if (label) {
+    updateStageSprite();
+}
 
-        label.textContent =
-            selectedSprite
-                ? `Editing: ${capitalize(selectedSprite)}`
-                : "No sprite selected";
+
+/* =========================================================
+   SPRITE LIST
+   ========================================================= */
+
+function setupSprites() {
+
+    $$(".sprite-card").forEach(card => {
+
+        card.addEventListener(
+            "click",
+            () => {
+
+                selectSprite(
+                    card.dataset.sprite
+                );
+            }
+        );
+
+    });
+
+
+    $("chooseSpriteButton")
+        ?.addEventListener(
+            "click",
+            addStarSprite
+        );
+
+
+    $("addSpriteButton")
+        ?.addEventListener(
+            "click",
+            addStarSprite
+        );
+}
+
+
+function addStarSprite() {
+
+    if (
+        qs(
+            '.sprite-card[data-sprite="Star"]'
+        )
+    ) {
+
+        $("stepStatus").textContent =
+            "Star is already in the Sprite List.";
+
+        return;
     }
+
+
+    const list =
+        $("spriteList");
+
+    if (!list) return;
+
+
+    const card =
+        document.createElement("button");
+
+    card.className =
+        "sprite-card";
+
+    card.dataset.sprite =
+        "Star";
+
+
+    card.innerHTML = `
+        <span class="sprite-thumb">
+            ★
+        </span>
+
+        <span>
+            <b>Star</b>
+            <small>Sprite</small>
+        </span>
+    `;
+
+
+    card.addEventListener(
+        "click",
+        () => {
+
+            selectSprite("Star");
+
+        }
+    );
+
+
+    list.appendChild(card);
+
+    scriptWorkspaces.Star = [];
+
+    $("stepStatus").textContent =
+        "✓ New Star sprite added.";
+
+    clearHighlights();
 }
 
 
@@ -1126,6 +1169,7 @@ function setupCategories() {
                     selectedCategory =
                         button.dataset.category;
 
+
                     $$(".block-category")
                         .forEach(item => {
 
@@ -1136,23 +1180,20 @@ function setupCategories() {
 
                         });
 
+
                     renderPalette();
 
                     clearHighlights();
 
-                    /*
-                       If this is the required category
-                       for the current lesson, highlight
-                       the required block — but DO NOT
-                       click/select it automatically.
-                    */
 
                     const step =
                         lessons[currentMission]
                             ?.steps[currentStep];
 
+
                     if (
-                        step?.category === selectedCategory &&
+                        step?.category ===
+                        selectedCategory &&
                         step?.block
                     ) {
 
@@ -1162,7 +1203,6 @@ function setupCategories() {
                     }
                 }
             );
-
         });
 }
 
@@ -1178,42 +1218,67 @@ function renderPalette() {
 
     if (!palette) return;
 
+
+    const names = {
+
+        motion: "Motion",
+        looks: "Looks",
+        sound: "Sound",
+        events: "Events",
+        control: "Control",
+        sensing: "Sensing",
+        operators: "Operators",
+        variables: "Variables",
+        myblocks: "My Blocks"
+    };
+
+
+    $("paletteCategory").textContent =
+        names[selectedCategory] ||
+        selectedCategory;
+
+
     palette.innerHTML = "";
 
-    const list =
-        scratchBlocks[selectedCategory] || [];
 
-    list.forEach(def => {
+    const categoryBlocks =
+        blocks[selectedCategory] || [];
 
-        const block =
-            document.createElement("button");
 
-        block.className =
-            `scratch-block palette-block block-${def.color}`;
+    categoryBlocks.forEach(
+        definition => {
 
-        block.dataset.block =
-            def.id;
+            const element =
+                document.createElement("button");
 
-        block.dataset.category =
-            selectedCategory;
+            element.className =
+                `scratch-block ${definition.className}`;
 
-        block.textContent =
-            def.text;
+            element.dataset.block =
+                definition.id;
 
-        block.addEventListener(
-            "click",
-            () => {
+            element.dataset.category =
+                selectedCategory;
 
-                addBlockToWorkspace(
-                    def
-                );
+            element.textContent =
+                definition.text;
 
-            }
-        );
 
-        palette.appendChild(block);
+            element.addEventListener(
+                "click",
+                () => {
 
-    });
+                    addBlockToWorkspace(
+                        selectedCategory,
+                        definition
+                    );
+                }
+            );
+
+
+            palette.appendChild(element);
+        }
+    );
 }
 
 
@@ -1221,39 +1286,49 @@ function renderPalette() {
    ADD BLOCK
    ========================================================= */
 
-function addBlockToWorkspace(def) {
+function addBlockToWorkspace(
+    category,
+    definition
+) {
 
     if (!selectedSprite) {
 
         $("stepStatus").textContent =
-            "⚠️ Select a sprite before adding code.";
+            "⚠️ Select a sprite first.";
 
         return;
     }
 
-    undoStack.push(
-        JSON.parse(
-            JSON.stringify(workspaceBlocks)
-        )
-    );
 
-    redoStack.length = 0;
+    saveUndo();
+
 
     workspaceBlocks.push({
 
-        id: def.id,
+        category,
 
-        text: def.text,
+        id:
+            definition.id,
 
-        category:
-            selectedCategory,
+        text:
+            definition.text,
 
         className:
-            `block-${def.color}`
+            definition.className,
 
+        inputs:
+            definition.inputs
+                ? definition.inputs.map(
+                    input => ({
+                        type: input.type,
+                        value: input.value
+                    })
+                )
+                : []
     });
 
-    saveCurrentSpriteScript();
+
+    saveCurrentSpriteWorkspace();
 
     renderWorkspace();
 
@@ -1261,14 +1336,26 @@ function addBlockToWorkspace(def) {
 
     clearHighlights();
 
+
     $("stepStatus").textContent =
-        `✓ "${def.text}" added to ${capitalize(selectedSprite)}.`;
+        "✓ Block added! Press NEXT to continue.";
+
+    $("bottomHint").textContent =
+        "Block added to your script.";
 }
 
 
 /* =========================================================
    WORKSPACE
    ========================================================= */
+
+function clearWorkspace() {
+
+    workspaceBlocks = [];
+
+    renderWorkspace();
+}
+
 
 function renderWorkspace() {
 
@@ -1277,47 +1364,41 @@ function renderWorkspace() {
 
     if (!workspace) return;
 
+
     workspace.innerHTML = "";
+
 
     if (!selectedSprite) {
 
         workspace.innerHTML = `
             <div class="workspace-empty">
-                <div style="font-size:36px">👆</div>
-                <strong>Select a sprite to see its scripts.</strong>
+                <div style="font-size:32px">👆</div>
+                <strong>Select a sprite</strong>
                 <br>
                 <small>
-                    AURA, SHADOW, ORB and PORTAL each have their own code.
+                    Each sprite has its own Scratch scripts.
                 </small>
             </div>
         `;
 
-        return;
-    }
-
-
-    if (!workspaceBlocks.length) {
+    } else if (
+        workspaceBlocks.length === 0
+    ) {
 
         workspace.innerHTML = `
             <div class="workspace-empty">
-                <div style="font-size:36px">🧩</div>
+                <div style="font-size:32px">🧩</div>
                 <strong>
-                    No blocks in ${capitalize(selectedSprite)}'s script yet.
+                    ${selectedSprite}'s script is empty
                 </strong>
                 <br>
                 <small>
-                    Click a Scratch block to add it.
+                    Tap a Scratch block to add it.
                 </small>
             </div>
         `;
 
     } else {
-
-        const wrapper =
-            document.createElement("div");
-
-        wrapper.className =
-            "workspace-blocks";
 
         workspaceBlocks.forEach(
             (block,index) => {
@@ -1326,84 +1407,252 @@ function renderWorkspace() {
                     document.createElement("div");
 
                 element.className =
-                    `workspace-block ${block.className || ""}`;
+                    `workspace-block ${block.className}`;
 
                 element.dataset.index =
                     index;
 
-                const text =
-                    document.createElement("span");
 
-                text.textContent =
-                    block.text;
-
-                element.appendChild(text);
+                buildWorkspaceBlock(
+                    element,
+                    block
+                );
 
 
-                const remove =
-                    document.createElement("button");
-
-                remove.className =
-                    "block-delete";
-
-                remove.textContent =
-                    "×";
-
-                remove.title =
-                    "Delete block";
+                workspace.appendChild(
+                    element
+                );
+            }
+        );
+    }
 
 
-                remove.addEventListener(
-                    "click",
-                    event => {
+    $("blockCount").textContent =
+        `${workspaceBlocks.length} block${workspaceBlocks.length === 1 ? "" : "s"}`;
 
-                        event.stopPropagation();
 
-                        undoStack.push(
-                            JSON.parse(
-                                JSON.stringify(
-                                    workspaceBlocks
-                                )
-                            )
-                        );
+    updateRunHint();
+}
 
-                        redoStack.length = 0;
 
-                        workspaceBlocks.splice(
-                            index,
-                            1
-                        );
+function buildWorkspaceBlock(
+    element,
+    block
+) {
 
-                        saveCurrentSpriteScript();
+    const span =
+        document.createElement("span");
 
-                        renderWorkspace();
+    span.textContent =
+        block.text;
 
-                        lastRunCompleted = false;
+
+    element.appendChild(span);
+
+
+    if (
+        block.inputs &&
+        block.inputs.length
+    ) {
+
+        block.inputs.forEach(
+            (inputData,index) => {
+
+                const input =
+                    document.createElement("input");
+
+                input.type =
+                    inputData.type === "number"
+                        ? "number"
+                        : "text";
+
+                input.value =
+                    inputData.value;
+
+                input.className =
+                    "block-input";
+
+
+                input.addEventListener(
+                    "input",
+                    () => {
+
+                        inputData.value =
+                            input.value;
+
+                        saveCurrentSpriteWorkspace();
+
+                        lastRunCompleted =
+                            false;
                     }
                 );
 
-                element.appendChild(remove);
 
-                wrapper.appendChild(element);
-
+                element.appendChild(
+                    input
+                );
             }
         );
-
-        workspace.appendChild(wrapper);
     }
 
 
-    if ($("selectedTarget")) {
+    const remove =
+        document.createElement("button");
 
-        $("selectedTarget").textContent =
-            capitalize(selectedSprite);
+    remove.className =
+        "workspace-delete";
+
+    remove.textContent =
+        "×";
+
+    remove.title =
+        "Remove block";
+
+
+    remove.addEventListener(
+        "click",
+        event => {
+
+            event.stopPropagation();
+
+            saveUndo();
+
+            const index =
+                Number(
+                    element.dataset.index
+                );
+
+            workspaceBlocks.splice(
+                index,
+                1
+            );
+
+            saveCurrentSpriteWorkspace();
+
+            renderWorkspace();
+        }
+    );
+
+
+    element.appendChild(
+        remove
+    );
+}
+
+
+/* =========================================================
+   UNDO / REDO
+   ========================================================= */
+
+function saveUndo() {
+
+    undoStack.push(
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        )
+    );
+
+
+    if (
+        undoStack.length > 30
+    ) {
+
+        undoStack.shift();
     }
 
-    if ($("blockCount")) {
 
-        $("blockCount").textContent =
-            `${workspaceBlocks.length} block${workspaceBlocks.length === 1 ? "" : "s"}`;
-    }
+    redoStack = [];
+}
+
+
+function undoWorkspace() {
+
+    if (
+        !selectedSprite ||
+        !undoStack.length
+    )
+        return;
+
+
+    redoStack.push(
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        )
+    );
+
+
+    workspaceBlocks =
+        undoStack.pop();
+
+    saveCurrentSpriteWorkspace();
+
+    renderWorkspace();
+}
+
+
+function redoWorkspace() {
+
+    if (
+        !selectedSprite ||
+        !redoStack.length
+    )
+        return;
+
+
+    undoStack.push(
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        )
+    );
+
+
+    workspaceBlocks =
+        redoStack.pop();
+
+    saveCurrentSpriteWorkspace();
+
+    renderWorkspace();
+}
+
+
+function setupUndoRedo() {
+
+    const buttons =
+        $$(".toolbar-icon");
+
+
+    buttons.forEach(button => {
+
+        if (
+            button.title ===
+            "Undo"
+        ) {
+
+            button.addEventListener(
+                "click",
+                undoWorkspace
+            );
+        }
+
+
+        if (
+            button.title ===
+            "Redo"
+        ) {
+
+            button.addEventListener(
+                "click",
+                redoWorkspace
+            );
+        }
+
+    });
 }
 
 
@@ -1423,7 +1672,6 @@ function setupEditorTabs() {
                     switchEditorTab(
                         tab.dataset.editorTab
                     );
-
                 }
             );
 
@@ -1432,12 +1680,12 @@ function setupEditorTabs() {
 
 
 function switchEditorTab(
-    tabName,
-    clear = true
+    tabName
 ) {
 
     currentEditorTab =
         tabName;
+
 
     $$(".project-tab")
         .forEach(tab => {
@@ -1450,95 +1698,49 @@ function switchEditorTab(
         });
 
 
-    const categories =
-        $(".block-categories");
+    if (
+        tabName === "costumes"
+    ) {
 
-    const palette =
-        $(".block-palette");
+        selectedAssetType =
+            "costumes";
 
+        renderAssets();
 
-    if (tabName === "code") {
+        clearHighlights();
 
-        categories?.classList.remove("hidden");
+        highlightEditorTab(
+            "costumes"
+        );
 
-        palette?.classList.remove("hidden");
-
-        renderWorkspace();
-
-    } else {
-
-        categories?.classList.add("hidden");
-
-        palette?.classList.add("hidden");
-
-        const workspace =
-            $("lessonBlocks");
-
-        if (workspace) {
-
-            workspace.innerHTML = `
-                <div class="workspace-empty">
-
-                    <div style="font-size:42px">
-                        ${tabName === "costumes" ? "🎭" : "🔊"}
-                    </div>
-
-                    <strong>
-                        ${capitalize(tabName)}
-                    </strong>
-
-                    <br>
-
-                    <small>
-                        Choose an asset from the library.
-                    </small>
-
-                </div>
-            `;
-        }
+        return;
     }
 
 
-    renderAssets();
+    if (
+        tabName === "sounds"
+    ) {
 
-    if (clear)
+        selectedAssetType =
+            "sounds";
+
+        renderAssets();
+
         clearHighlights();
-}
+
+        highlightEditorTab(
+            "sounds"
+        );
+
+        return;
+    }
 
 
-/* =========================================================
-   ASSET TABS
-   ========================================================= */
+    clearHighlights();
 
-function setupAssetTabs() {
+    renderPalette();
 
-    $$(".asset-tab")
-        .forEach(tab => {
-
-            tab.addEventListener(
-                "click",
-                () => {
-
-                    selectedAssetType =
-                        tab.dataset.asset;
-
-                    $$(".asset-tab")
-                        .forEach(item => {
-
-                            item.classList.toggle(
-                                "active",
-                                item === tab
-                            );
-
-                        });
-
-                    renderAssets();
-
-                    clearHighlights();
-                }
-            );
-
-        });
+    renderWorkspace();
 }
 
 
@@ -1546,89 +1748,166 @@ function setupAssetTabs() {
    ASSETS
    ========================================================= */
 
-function renderAssets() {
+function setupAssets() {
 
-    const library =
-        $("assetLibrary");
+    renderAssets();
 
-    if (!library) return;
 
-    const sprite =
-        selectedSprite || "aura";
-
-    const data =
-        spriteAssets[sprite] ||
-        spriteAssets.aura;
-
-    const assets =
-        data[selectedAssetType] || [];
-
-    library.innerHTML = "";
-
-    assets.forEach(asset => {
-
-        const button =
-            document.createElement("button");
-
-        button.className =
-            "asset-item";
-
-        button.dataset.asset =
-            asset;
-
-        button.innerHTML = `
-            <span class="asset-icon">
-                ${selectedAssetType === "sounds" ? "🔊" : "🎭"}
-            </span>
-
-            <span>${asset}</span>
-        `;
-
-        button.addEventListener(
+    $("assetLibraryAdd")
+        ?.addEventListener(
             "click",
             () => {
 
-                selectedAsset =
-                    asset;
-
-                $$(".asset-item")
-                    .forEach(item => {
-
-                        item.classList.remove(
-                            "selected"
-                        );
-
-                    });
-
-                button.classList.add(
-                    "selected"
-                );
-
-                clearHighlights();
-
-                if (
-                    selectedAssetType ===
-                    "costumes"
-                ) {
-
-                    updateStageCostume(
-                        asset
-                    );
-
-                } else {
-
-                    playSound(
-                        asset
-                    );
-                }
-
                 $("stepStatus").textContent =
-                    `✓ ${asset} selected.`;
+                    "Choose an asset from the library.";
             }
         );
 
-        library.appendChild(button);
-    });
+
+    $("chooseAssetButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                $("stepStatus").textContent =
+                    "Choose an asset from the library.";
+            }
+        );
+
+
+    $("uploadAssetButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                $("stepStatus").textContent =
+                    "Upload is simulated in this learning lab.";
+            }
+        );
+
+
+    $("paintAssetButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                $("stepStatus").textContent =
+                    "Paint mode is simulated in this learning lab.";
+            }
+        );
+}
+
+
+function renderAssets() {
+
+    const items =
+        $("assetLibraryItems");
+
+    if (!items) return;
+
+
+    const sprite =
+        selectedSprite ||
+        "Aura";
+
+
+    const data =
+        spriteAssets[sprite] ||
+        spriteAssets.Aura;
+
+
+    const assets =
+        data[selectedAssetType] ||
+        [];
+
+
+    $("assetLibraryTitle").textContent =
+        selectedAssetType === "sounds"
+            ? "SOUNDS"
+            : "COSTUMES";
+
+
+    items.innerHTML = "";
+
+
+    assets.forEach(
+        (asset,index) => {
+
+            const button =
+                document.createElement("button");
+
+            button.className =
+                "asset-item";
+
+            button.dataset.asset =
+                asset;
+
+
+            button.innerHTML =
+                selectedAssetType === "sounds"
+                    ? "🔊"
+                    : index === 0
+                        ? "A"
+                        : "🎭";
+
+
+            button.title =
+                asset;
+
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    selectedAsset =
+                        asset;
+
+
+                    $$(".asset-item")
+                        .forEach(
+                            item =>
+                                item.classList.remove(
+                                    "selected"
+                                )
+                        );
+
+
+                    button.classList.add(
+                        "selected"
+                    );
+
+
+                    if (
+                        selectedAssetType ===
+                        "costumes"
+                    ) {
+
+                        updateStageCostume(
+                            asset
+                        );
+
+                    } else {
+
+                        playSound(
+                            asset
+                        );
+                    }
+
+
+                    clearHighlights();
+
+
+                    $("stepStatus").textContent =
+                        `✓ ${asset} selected.`;
+                }
+            );
+
+
+            items.appendChild(
+                button
+            );
+        }
+    );
 }
 
 
@@ -1640,21 +1919,43 @@ function setupBackdrops() {
 
     renderBackdrops();
 
-    $("backdropLibrary")
+
+    $("addBackdropButton")
         ?.addEventListener(
             "click",
-            event => {
+            addSunsetBackdrop
+        );
 
-                const card =
-                    event.target.closest(
-                        ".backdrop-card"
-                    );
 
-                if (!card) return;
+    $("chooseBackdropButton")
+        ?.addEventListener(
+            "click",
+            () => {
 
-                selectBackdrop(
-                    card.dataset.backdrop
-                );
+                $("stepStatus").textContent =
+                    "Choose a backdrop from the library.";
+            }
+        );
+
+
+    $("uploadBackdropButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                $("stepStatus").textContent =
+                    "Upload is simulated in this learning lab.";
+            }
+        );
+
+
+    $("paintBackdropButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                $("stepStatus").textContent =
+                    "Paint mode is simulated in this learning lab.";
             }
         );
 }
@@ -1662,44 +1963,79 @@ function setupBackdrops() {
 
 function renderBackdrops() {
 
-    const library =
-        $("backdropLibrary");
+    const items =
+        $("backdropItems");
 
-    if (!library) return;
+    if (!items) return;
 
-    library.innerHTML = "";
 
-    ["space","neon","city"]
-        .forEach(name => {
+    items.innerHTML = "";
 
-            const card =
+
+    Object.keys(
+        backdropData
+    ).forEach(
+        name => {
+
+            const button =
                 document.createElement("button");
 
-            card.className =
+            button.className =
                 "backdrop-card";
 
-            card.dataset.backdrop =
+            button.dataset.backdrop =
                 name;
 
-            card.innerHTML = `
+
+            button.innerHTML = `
                 <div
                     class="backdrop-thumb"
-                    style="
-                        background:${backdropData[name]}
-                    ">
-                </div>
+                    style="background:${backdropData[name]}"
+                ></div>
 
                 <small>
                     ${capitalize(name)}
                 </small>
             `;
 
-            library.appendChild(card);
-        });
 
-    selectBackdropVisual(
-        selectedBackdrop
+            button.addEventListener(
+                "click",
+                () => {
+
+                    selectBackdrop(
+                        name
+                    );
+                }
+            );
+
+
+            items.appendChild(
+                button
+            );
+        }
     );
+
+
+    updateBackdropVisual();
+}
+
+
+function addSunsetBackdrop() {
+
+    if (
+        qs(
+            '.backdrop-card[data-backdrop="sunset"]'
+        )
+    )
+        return;
+
+
+    renderBackdrops();
+
+
+    $("stepStatus").textContent =
+        "✓ Sunset backdrop added.";
 }
 
 
@@ -1708,43 +2044,48 @@ function selectBackdrop(name) {
     selectedBackdrop =
         name;
 
-    selectBackdropVisual(
-        name
-    );
+
+    updateBackdropVisual();
 
     clearHighlights();
+
 
     $("stepStatus").textContent =
         `✓ ${capitalize(name)} backdrop selected.`;
 }
 
 
-function selectBackdropVisual(name) {
+function updateBackdropVisual() {
 
     $$(".backdrop-card")
         .forEach(card => {
 
             card.classList.toggle(
                 "selected",
-                card.dataset.backdrop === name
+                card.dataset.backdrop ===
+                selectedBackdrop
             );
 
         });
 
+
     const scene =
-        $("stageBackground");
+        qs(".stage-scene");
+
 
     if (scene) {
 
         scene.style.background =
-            backdropData[name] ||
+            backdropData[
+                selectedBackdrop
+            ] ||
             backdropData.space;
     }
 }
 
 
 /* =========================================================
-   HIGHLIGHT SYSTEM
+   HIGHLIGHTS
    ========================================================= */
 
 function clearHighlights() {
@@ -1755,7 +2096,6 @@ function clearHighlights() {
             element.classList.remove(
                 "lesson-target"
             );
-
         });
 }
 
@@ -1768,11 +2108,14 @@ function addHighlight(element) {
         "lesson-target"
     );
 
-    element.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "nearest"
-    });
+    try {
+
+        element.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest"
+        });
+
+    } catch {}
 }
 
 
@@ -1780,50 +2123,32 @@ function highlightTarget(target) {
 
     clearHighlights();
 
+
     const map = {
 
         "sprite-aura":
-            '.sprite-card[data-sprite="aura"]',
+            '.sprite-card[data-sprite="Aura"]',
 
         "sprite-shadow":
-            '.sprite-card[data-sprite="shadow"]',
+            '.sprite-card[data-sprite="Shadow"]',
 
         "sprite-orb":
-            '.sprite-card[data-sprite="orb"]',
+            '.sprite-card[data-sprite="Orb"]',
 
         "sprite-portal":
-            '.sprite-card[data-sprite="portal"]',
+            '.sprite-card[data-sprite="Portal"]',
 
         "choose-sprite":
             "#chooseSpriteButton",
 
         "run-button":
-            "#stageGreenFlag"
+            "#lessonFlag"
     };
 
-    addHighlight(
-        qs(map[target])
-    );
-}
-
-
-function highlightCategory(category) {
-
-    clearHighlights();
 
     addHighlight(
         qs(
-            `.block-category[data-category="${category}"]`
-        )
-    );
-}
-
-
-function highlightBlockOnly(id) {
-
-    addHighlight(
-        qs(
-            `.scratch-block[data-block="${id}"]`
+            map[target]
         )
     );
 }
@@ -1831,31 +2156,28 @@ function highlightBlockOnly(id) {
 
 function highlightEditorTab(tab) {
 
-    clearHighlights();
-
-    addHighlight(
+    const element =
         qs(
             `.project-tab[data-editor-tab="${tab}"]`
-        )
+        );
+
+    addHighlight(
+        element
     );
 }
 
 
-function highlightAsset(name) {
-
-    clearHighlights();
+function highlightBlockOnly(blockId) {
 
     addHighlight(
         qs(
-            `.asset-item[data-asset="${CSS.escape(name)}"]`
+            `.scratch-block[data-block="${blockId}"]`
         )
     );
 }
 
 
 function highlightBackdrop(name) {
-
-    clearHighlights();
 
     addHighlight(
         qs(
@@ -1866,116 +2188,164 @@ function highlightBackdrop(name) {
 
 
 /* =========================================================
-   PART 1 ENDS HERE
-   ========================================================= */
-/* =========================================================
-   AURA PLUS — PART 2 / 3
-   LESSON ENGINE + VERIFICATION + RUNNER
+   LESSON ENGINE
    ========================================================= */
 
+function openMission(mission) {
 
-/* =========================================================
-   LESSON STEP RENDERING
-   ========================================================= */
+    if (!lessons[mission])
+        return;
+
+
+    currentMission =
+        mission;
+
+    currentStep =
+        0;
+
+
+    /*
+       IMPORTANT:
+       Do not auto-select AURA.
+    */
+
+    selectedSprite =
+        null;
+
+
+    selectedCategory =
+        "motion";
+
+
+    selectedAsset =
+        null;
+
+
+    selectedAssetType =
+        "costumes";
+
+
+    selectedBackdrop =
+        "space";
+
+
+    currentEditorTab =
+        "code";
+
+
+    workspaceBlocks =
+        [];
+
+
+    undoStack =
+        [];
+
+
+    redoStack =
+        [];
+
+
+    lastRunCompleted =
+        false;
+
+
+    showScreen(
+        "lessonScreen"
+    );
+
+
+    updateSpriteSelection();
+
+    renderPalette();
+
+    renderAssets();
+
+    renderBackdrops();
+
+    renderWorkspace();
+
+    renderLessonStep();
+}
+
 
 function renderLessonStep() {
 
     const lesson =
         lessons[currentMission];
 
-    if (!lesson) return;
+
+    if (!lesson)
+        return;
+
 
     const step =
         lesson.steps[currentStep];
 
-    if (!step) return;
 
+    if (!step)
+        return;
 
-    /* -----------------------------------------
-       Basic lesson text
-       ----------------------------------------- */
-
-    if ($("lessonNumber")) {
-
-        $("lessonNumber").textContent =
-            `MISSION ${currentMission}`;
-    }
-
-    if ($("lessonStep")) {
-
-        $("lessonStep").textContent =
-            `STEP ${currentStep + 1}`;
-    }
-
-    if ($("lessonTitle")) {
-
-        $("lessonTitle").textContent =
-            step.title;
-    }
-
-    if ($("lessonDescription")) {
-
-        $("lessonDescription").textContent =
-            lesson.description;
-    }
-
-    if ($("actionText")) {
-
-        $("actionText").textContent =
-            step.action;
-    }
-
-
-    /* -----------------------------------------
-       Why / teacher tip
-       ----------------------------------------- */
-
-    if ($("lessonWhy")) {
-
-        $("lessonWhy").textContent =
-            getWhyText(currentMission);
-    }
-
-    if ($("teacherTip")) {
-
-        $("teacherTip").textContent =
-            getTeacherTip(currentMission);
-    }
-
-
-    /* -----------------------------------------
-       Progress
-       ----------------------------------------- */
 
     const total =
         lesson.steps.length;
 
-    const percent =
-        ((currentStep) / total) * 100;
 
-    if ($("stepProgressBar")) {
-
-        $("stepProgressBar").style.width =
-            `${percent}%`;
-    }
+    $("lessonNumber").textContent =
+        currentMission;
 
 
-    /* -----------------------------------------
-       RESET VISUAL GUIDANCE
-       ----------------------------------------- */
+    $("lessonStep").textContent =
+        `${currentStep + 1}/${total}`;
+
+
+    $("lessonTitle").textContent =
+        step.title;
+
+
+    $("lessonDescription").textContent =
+        lesson.description;
+
+
+    $("actionText").textContent =
+        step.action;
+
+
+    $("lessonWhy").textContent =
+        getLessonWhy(
+            currentMission
+        );
+
+
+    $("teacherTip").textContent =
+        getTeacherTip(
+            currentMission
+        );
+
+
+    $("workspaceInstruction").textContent =
+        "Do the highlighted action yourself, then press NEXT.";
+
+
+    $("bottomHint").textContent =
+        step.action;
+
+
+    $("stepProgressBar").style.width =
+        `${((currentStep + 1) / total) * 100}%`;
+
+
+    $("nextLessonStep").innerHTML =
+        currentStep === total - 1
+            ? "FINISH <span>✓</span>"
+            : "NEXT <span>→</span>";
+
 
     clearHighlights();
 
 
     /*
-       VERY IMPORTANT:
-
-       renderLessonStep NEVER performs the
-       student's action.
-
-       It only tells/highlights what to do.
+       NEVER perform the action automatically.
     */
-
 
     if (step.target) {
 
@@ -1993,43 +2363,29 @@ function renderLessonStep() {
     }
 
 
-    if (step.category) {
+    if (
+        step.category &&
+        !step.tab
+    ) {
 
-        highlightCategory(
-            step.category
+        addHighlight(
+            qs(
+                `.block-category[data-category="${step.category}"]`
+            )
         );
     }
 
 
-    if (step.block) {
+    if (
+        step.block &&
+        selectedCategory ===
+        step.category &&
+        currentEditorTab ===
+        "code"
+    ) {
 
-        /*
-           Only highlight the block if the
-           correct category is already open.
-        */
-
-        if (
-            selectedCategory ===
-            step.category &&
-            currentEditorTab === "code"
-        ) {
-
-            highlightBlockOnly(
-                step.block
-            );
-        }
-    }
-
-
-    if (step.assetName) {
-
-        /*
-           Do not select the asset.
-           Only guide the student toward it.
-        */
-
-        highlightAsset(
-            step.assetName
+        highlightBlockOnly(
+            step.block
         );
     }
 
@@ -2042,225 +2398,127 @@ function renderLessonStep() {
     }
 
 
-    /* -----------------------------------------
-       Step status
-       ----------------------------------------- */
-
-    if ($("stepStatus")) {
-
-        $("stepStatus").textContent =
-            "👉 Complete the step, then press NEXT.";
-    }
-
-
-    /* -----------------------------------------
-       NEXT button
-       ----------------------------------------- */
-
-    const next =
-        $("nextLessonStep");
-
-    if (next) {
-
-        next.disabled = false;
-
-        next.textContent =
-            currentStep === total - 1
-                ? "FINISH ✓"
-                : "NEXT →";
-    }
+    $("stepStatus").textContent =
+        "👉 Complete this step yourself, then press NEXT.";
 }
 
 
-/* =========================================================
-   WHY TEXT
-   ========================================================= */
+function getLessonWhy(mission) {
 
-function getWhyText(mission) {
-
-    const why = {
+    const text = {
 
         1:
-            "Sprites are the characters and objects that make up a Scratch project.",
+            "Sprites are the characters and objects in a Scratch project.",
 
         2:
-            "Motion blocks control where a sprite moves on the stage.",
+            "Motion blocks control where a sprite moves.",
 
         3:
-            "A sprite can have multiple costumes, so its appearance can change.",
+            "A sprite can have multiple costumes.",
 
         4:
-            "Every sprite can have its own independent scripts.",
+            "Each sprite can have its own independent scripts.",
 
         5:
-            "Backdrops create the setting or world of your project.",
+            "Backdrops create the setting of the project.",
 
         6:
-            "Sounds can make actions and events much more exciting.",
+            "Sounds give feedback and make projects more exciting.",
 
         7:
-            "A real game combines sprites, movement, sensing, variables and decisions."
+            "Real games combine sprites, movement, sensing, variables and decisions."
     };
 
-    return why[mission] || "";
+
+    return text[mission] || "";
 }
 
-
-/* =========================================================
-   TEACHER TIP
-   ========================================================= */
 
 function getTeacherTip(mission) {
 
-    const tips = {
+    const text = {
 
         1:
             "Think of sprites as actors on a stage.",
 
         2:
-            "Change one number and see what happens.",
+            "Try changing the number inside a Motion block.",
 
         3:
-            "Costumes change appearance, not the sprite itself.",
+            "Costumes change appearance, not the identity of the sprite.",
 
         4:
-            "Look carefully: SHADOW's script should not be AURA's script.",
+            "Watch the selected sprite — its script belongs only to it.",
 
         5:
-            "A backdrop belongs to the Stage, not to a sprite.",
+            "The Stage uses backdrops.",
 
         6:
-            "Try different sounds and notice how they change the feeling.",
+            "Different sounds can create completely different moods.",
 
         7:
-            "Games are built by combining small ideas into one system."
+            "Build small ideas, then combine them into a game."
     };
 
-    return tips[mission] || "";
+
+    return text[mission] || "";
 }
 
 
 /* =========================================================
-   LESSON NEXT BUTTON
-   ========================================================= */
-
-function setupLessonButton() {
-
-    const button =
-        $("nextLessonStep");
-
-    if (!button) return;
-
-
-    button.addEventListener(
-        "click",
-        () => {
-
-            const step =
-                lessons[currentMission]
-                    ?.steps[currentStep];
-
-            if (!step) return;
-
-
-            /*
-               DO NOT ADVANCE until the student
-               has actually completed the step.
-            */
-
-            const result =
-                verifyLessonStep(step);
-
-
-            if (!result.ok) {
-
-                showStepError(
-                    result.message
-                );
-
-                return;
-            }
-
-
-            /* ----------------------------------
-               Correct!
-               ---------------------------------- */
-
-            showStepSuccess(
-                result.message ||
-                "Excellent! Step complete."
-            );
-
-
-            clearHighlights();
-
-
-            const total =
-                lessons[currentMission]
-                    .steps.length;
-
-
-            if (
-                currentStep <
-                total - 1
-            ) {
-
-                currentStep++;
-
-                lastRunCompleted = false;
-
-                renderLessonStep();
-
-            } else {
-
-                completeMission();
-            }
-
-        }
-    );
-}
-
-
-/* =========================================================
-   VERIFY LESSON STEP
+   STEP VERIFICATION
    ========================================================= */
 
 function verifyLessonStep(step) {
 
 
     /* -----------------------------------------
-       Sprite selection
+       SPRITE
        ----------------------------------------- */
 
     if (step.target) {
 
         const required =
             step.target
-                .replace("sprite-", "");
+                .replace(
+                    "sprite-",
+                    ""
+                );
+
+
+        const expected =
+            capitalize(
+                required
+            );
+
 
         if (
             selectedSprite !==
-            required
+            expected
         ) {
 
             return {
+
                 ok: false,
 
                 message:
-                    `Not yet! Select ${capitalize(required)} first.`
+                    `Select ${expected} first.`
             };
         }
 
+
         return {
+
             ok: true,
+
             message:
-                `✓ ${capitalize(required)} selected.`
+                `✓ ${expected} selected.`
         };
     }
 
 
     /* -----------------------------------------
-       Editor tab
+       TAB
        ----------------------------------------- */
 
     if (step.tab) {
@@ -2271,23 +2529,58 @@ function verifyLessonStep(step) {
         ) {
 
             return {
+
                 ok: false,
 
                 message:
                     `Click the ${capitalize(step.tab)} tab first.`
             };
         }
-
-        return {
-            ok: true,
-            message:
-                `✓ ${capitalize(step.tab)} tab opened.`
-        };
     }
 
 
     /* -----------------------------------------
-       Backdrop
+       ASSET
+       ----------------------------------------- */
+
+    if (step.asset) {
+
+        const requiredType =
+            step.asset === "sound"
+                ? "sounds"
+                : "costumes";
+
+
+        if (
+            selectedAssetType !==
+            requiredType
+        ) {
+
+            return {
+
+                ok: false,
+
+                message:
+                    `Open ${capitalize(requiredType)} first.`
+            };
+        }
+
+
+        if (!selectedAsset) {
+
+            return {
+
+                ok: false,
+
+                message:
+                    "Choose an asset from the library first."
+            };
+        }
+    }
+
+
+    /* -----------------------------------------
+       BACKDROP
        ----------------------------------------- */
 
     if (step.backdrop) {
@@ -2298,50 +2591,27 @@ function verifyLessonStep(step) {
         ) {
 
             return {
+
                 ok: false,
 
                 message:
-                    `Choose the ${capitalize(step.backdrop)} backdrop first.`
+                    `Click the ${capitalize(step.backdrop)} backdrop first.`
             };
         }
 
+
         return {
+
             ok: true,
+
             message:
-                `✓ ${capitalize(step.backdrop)} backdrop selected.`
+                "✓ Backdrop selected."
         };
     }
 
 
     /* -----------------------------------------
-       Asset
-       ----------------------------------------- */
-
-    if (step.assetName) {
-
-        if (
-            selectedAsset !==
-            step.assetName
-        ) {
-
-            return {
-                ok: false,
-
-                message:
-                    `Click "${step.assetName}" in the asset library first.`
-            };
-        }
-
-        return {
-            ok: true,
-            message:
-                `✓ ${step.assetName} selected.`
-        };
-    }
-
-
-    /* -----------------------------------------
-       Block
+       BLOCK
        ----------------------------------------- */
 
     if (step.block) {
@@ -2352,6 +2622,7 @@ function verifyLessonStep(step) {
         ) {
 
             return {
+
                 ok: false,
 
                 message:
@@ -2366,15 +2637,16 @@ function verifyLessonStep(step) {
         ) {
 
             return {
+
                 ok: false,
 
                 message:
-                    `Open the ${capitalize(step.category)} category first.`
+                    `Open ${capitalize(step.category)} first.`
             };
         }
 
 
-        const found =
+        const exists =
             workspaceBlocks.some(
                 block =>
                     block.id ===
@@ -2382,11 +2654,11 @@ function verifyLessonStep(step) {
             );
 
 
-        if (!found) {
+        if (!exists) {
 
             const definition =
                 (
-                    scratchBlocks[
+                    blocks[
                         step.category
                     ] || []
                 ).find(
@@ -2397,15 +2669,17 @@ function verifyLessonStep(step) {
 
 
             return {
+
                 ok: false,
 
                 message:
-                    `Click "${definition?.text || step.block}" to add it.`
+                    `Click "${definition?.text || step.block}" first.`
             };
         }
 
 
         return {
+
             ok: true,
 
             message:
@@ -2415,7 +2689,7 @@ function verifyLessonStep(step) {
 
 
     /* -----------------------------------------
-       Run requirement
+       RUN
        ----------------------------------------- */
 
     if (step.run) {
@@ -2423,64 +2697,45 @@ function verifyLessonStep(step) {
         if (!lastRunCompleted) {
 
             return {
+
                 ok: false,
 
                 message:
-                    "Click the green flag and let the project run first."
+                    "Click the green flag and let your script finish."
             };
         }
 
+
         return {
+
             ok: true,
 
             message:
-                "✓ Project tested successfully."
+                "✓ Script tested successfully."
         };
     }
 
 
     /* -----------------------------------------
-       Final game
+       GAME
        ----------------------------------------- */
 
     if (step.runGame) {
 
-        if (!gameRunning) {
-
-            return {
-                ok: false,
-
-                message:
-                    "Launch AURA PLUS with the green flag first."
-            };
-        }
-
-
-        if (
-            auraGame.score <
-            50
-        ) {
-
-            return {
-                ok: false,
-
-                message:
-                    `Collect all 5 Aura Orbs first. Score: ${auraGame.score}/50`
-            };
-        }
-
-
         return {
+
             ok: true,
 
             message:
-                "🏆 AURA PLUS completed!"
+                "Launching AURA PLUS..."
         };
     }
 
 
     return {
+
         ok: true,
+
         message:
             "✓ Step complete."
     };
@@ -2488,7 +2743,89 @@ function verifyLessonStep(step) {
 
 
 /* =========================================================
-   STEP FEEDBACK
+   NEXT BUTTON
+   ========================================================= */
+
+function setupLessonButton() {
+
+    $("nextLessonStep")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                const lesson =
+                    lessons[currentMission];
+
+
+                const step =
+                    lesson?.steps[
+                        currentStep
+                    ];
+
+
+                if (!step)
+                    return;
+
+
+                /*
+                   Final game step:
+                   NEXT launches the actual game.
+                */
+
+                if (
+                    step.runGame
+                ) {
+
+                    launchAuraPlusFromLesson();
+
+                    return;
+                }
+
+
+                const result =
+                    verifyLessonStep(
+                        step
+                    );
+
+
+                if (!result.ok) {
+
+                    showStepError(
+                        result.message
+                    );
+
+                    return;
+                }
+
+
+                showStepSuccess(
+                    result.message
+                );
+
+
+                if (
+                    currentStep <
+                    lesson.steps.length - 1
+                ) {
+
+                    currentStep++;
+
+                    lastRunCompleted =
+                        false;
+
+                    renderLessonStep();
+
+                } else {
+
+                    completeMission();
+                }
+            }
+        );
+}
+
+
+/* =========================================================
+   FEEDBACK
    ========================================================= */
 
 function showStepError(message) {
@@ -2496,18 +2833,18 @@ function showStepError(message) {
     const status =
         $("stepStatus");
 
-    if (!status) return;
+    if (!status)
+        return;
+
 
     status.textContent =
         `⚠️ ${message}`;
 
-    status.classList.remove(
-        "success"
-    );
 
     status.classList.add(
         "error"
     );
+
 
     setTimeout(
         () => {
@@ -2517,7 +2854,7 @@ function showStepError(message) {
             );
 
         },
-        1800
+        1500
     );
 }
 
@@ -2527,18 +2864,743 @@ function showStepSuccess(message) {
     const status =
         $("stepStatus");
 
-    if (!status) return;
+    if (!status)
+        return;
+
 
     status.textContent =
         message;
 
-    status.classList.remove(
-        "error"
-    );
 
     status.classList.add(
         "success"
     );
+
+
+    setTimeout(
+        () => {
+
+            status.classList.remove(
+                "success"
+            );
+
+        },
+        1200
+    );
+}
+
+
+/* =========================================================
+   RUNNER
+   ========================================================= */
+
+function setupRunButtons() {
+
+    $("lessonFlag")
+        ?.addEventListener(
+            "click",
+            runWorkspace
+        );
+
+
+    $("stageFlag")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                if (
+                    currentMission ===
+                    7
+                ) {
+
+                    startGame();
+
+                } else {
+
+                    runWorkspace();
+                }
+            }
+        );
+
+
+    $("lessonStop")
+        ?.addEventListener(
+            "click",
+            stopLessonPreview
+        );
+
+
+    $("stageStop")
+        ?.addEventListener(
+            "click",
+            stopLessonPreview
+        );
+}
+
+
+function runWorkspace() {
+
+    if (!selectedSprite) {
+
+        showStepError(
+            "Select a sprite first."
+        );
+
+        return;
+    }
+
+
+    saveCurrentSpriteWorkspace();
+
+
+    if (lessonRunTimer) {
+
+        clearTimeout(
+            lessonRunTimer
+        );
+    }
+
+
+    lastRunCompleted =
+        false;
+
+    lessonRunning =
+        true;
+
+
+    const preview =
+        $("previewPlayer");
+
+
+    if (!preview)
+        return;
+
+
+    let x = 50;
+
+    let y = 50;
+
+    let direction = 90;
+
+    let size = 100;
+
+    let index = 0;
+
+
+    const runBlocks =
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        );
+
+
+    function executeNext() {
+
+        if (
+            index >=
+            runBlocks.length
+        ) {
+
+            lessonRunning =
+                false;
+
+            lastRunCompleted =
+                true;
+
+            $("stepStatus").textContent =
+                "✓ Script finished running.";
+
+            return;
+        }
+
+
+        const block =
+            runBlocks[index];
+
+
+        const value =
+            Number(
+                block.inputs?.find(
+                    input =>
+                        input.type ===
+                        "number"
+                )?.value ||
+                10
+            );
+
+
+        switch (
+            block.id
+        ) {
+
+            case "flag":
+
+                x = 50;
+                y = 50;
+
+                break;
+
+
+            case "move":
+
+                x +=
+                    value / 2;
+
+                break;
+
+
+            case "changex":
+
+                x +=
+                    value / 2;
+
+                break;
+
+
+            case "changey":
+
+                y -=
+                    value / 2;
+
+                break;
+
+
+            case "setx":
+
+                x =
+                    50 +
+                    value / 2;
+
+                break;
+
+
+            case "sety":
+
+                y =
+                    50 -
+                    value / 2;
+
+                break;
+
+
+            case "random":
+
+                x =
+                    15 +
+                    Math.random() *
+                    70;
+
+                y =
+                    15 +
+                    Math.random() *
+                    70;
+
+                break;
+
+
+            case "turn":
+
+                direction +=
+                    value;
+
+                preview.style.transform =
+                    `translate(-50%,-50%) rotate(${direction}deg)`;
+
+                break;
+
+
+            case "size":
+
+                size =
+                    clamp(
+                        size + value,
+                        40,
+                        180
+                    );
+
+                preview.style.width =
+                    `${30 * size / 100}px`;
+
+                preview.style.height =
+                    `${30 * size / 100}px`;
+
+                break;
+
+
+            case "nextcostume":
+
+                updateStageCostume(
+                    "AURA GLOW"
+                );
+
+                break;
+
+
+            case "say":
+
+                showStageBubble(
+                    block.inputs?.find(
+                        input =>
+                            input.type ===
+                            "text"
+                    )?.value ||
+                    "Hello!"
+                );
+
+                break;
+
+
+            case "soundstart":
+            case "soundwait":
+
+                playSound(
+                    "Meow"
+                );
+
+                break;
+
+
+            case "setvar":
+            case "changevar":
+
+                pulseStage();
+
+                break;
+
+
+            case "bounce":
+
+                x =
+                    clamp(
+                        x,
+                        10,
+                        90
+                    );
+
+                y =
+                    clamp(
+                        y,
+                        10,
+                        90
+                    );
+
+                break;
+        }
+
+
+        x =
+            clamp(
+                x,
+                8,
+                92
+            );
+
+
+        y =
+            clamp(
+                y,
+                10,
+                88
+            );
+
+
+        preview.style.left =
+            `${x}%`;
+
+        preview.style.top =
+            `${y}%`;
+
+
+        index++;
+
+
+        lessonRunTimer =
+            setTimeout(
+                executeNext,
+                300
+            );
+    }
+
+
+    executeNext();
+}
+
+
+function stopLessonPreview() {
+
+    if (lessonRunTimer) {
+
+        clearTimeout(
+            lessonRunTimer
+        );
+
+        lessonRunTimer =
+            null;
+    }
+
+
+    lessonRunning =
+        false;
+
+
+    resetPreview();
+}
+
+
+function resetPreview() {
+
+    const preview =
+        $("previewPlayer");
+
+    if (!preview)
+        return;
+
+
+    preview.style.left =
+        "50%";
+
+    preview.style.top =
+        "50%";
+
+    preview.style.width =
+        "30px";
+
+    preview.style.height =
+        "30px";
+
+    preview.style.transform =
+        "translate(-50%,-50%)";
+
+
+    hideStageBubble();
+}
+
+
+/* =========================================================
+   STAGE
+   ========================================================= */
+
+function updateStageSprite() {
+
+    const preview =
+        $("previewPlayer");
+
+    if (!preview)
+        return;
+
+
+    const data = {
+
+        Aura: {
+            text: "A",
+            background:
+                "radial-gradient(circle,#fff,#a78bfa 45%,#7c3aed)"
+        },
+
+        Shadow: {
+            text: "◆",
+            background:
+                "linear-gradient(135deg,#111827,#7f1d1d)"
+        },
+
+        Orb: {
+            text: "●",
+            background:
+                "radial-gradient(circle,#fff,#22d3ee)"
+        },
+
+        Portal: {
+            text: "✦",
+            background:
+                "radial-gradient(circle,#fff,#8b5cf6)"
+        },
+
+        Star: {
+            text: "★",
+            background:
+                "radial-gradient(circle,#fff,#facc15)"
+        }
+    };
+
+
+    const sprite =
+        data[selectedSprite] ||
+        data.Aura;
+
+
+    preview.textContent =
+        sprite.text;
+
+
+    preview.style.background =
+        sprite.background;
+}
+
+
+function updateStageCostume(
+    costume
+) {
+
+    const preview =
+        $("previewPlayer");
+
+    if (!preview)
+        return;
+
+
+    if (
+        costume
+            .toLowerCase()
+            .includes("glow")
+    ) {
+
+        preview.style.boxShadow =
+            "0 0 35px #c4b5fd";
+
+    } else {
+
+        preview.style.boxShadow =
+            "0 0 18px #8b5cf6";
+    }
+
+
+    $("stepStatus").textContent =
+        `✓ Costume changed to ${costume}.`;
+}
+
+
+function showStageBubble(
+    text
+) {
+
+    const stage =
+        $("previewStage");
+
+    if (!stage)
+        return;
+
+
+    let bubble =
+        stage.querySelector(
+            ".stage-speech"
+        );
+
+
+    if (!bubble) {
+
+        bubble =
+            document.createElement(
+                "div"
+            );
+
+        bubble.className =
+            "stage-speech";
+
+
+        Object.assign(
+            bubble.style,
+            {
+
+                position:
+                    "absolute",
+
+                zIndex:
+                    "20",
+
+                left:
+                    "50%",
+
+                top:
+                    "25%",
+
+                transform:
+                    "translateX(-50%)",
+
+                padding:
+                    "8px 12px",
+
+                background:
+                    "#fff",
+
+                color:
+                    "#111827",
+
+                borderRadius:
+                    "10px",
+
+                fontSize:
+                    "10px",
+
+                fontWeight:
+                    "800"
+            }
+        );
+
+
+        stage.appendChild(
+            bubble
+        );
+    }
+
+
+    bubble.textContent =
+        text;
+
+
+    setTimeout(
+        hideStageBubble,
+        1800
+    );
+}
+
+
+function hideStageBubble() {
+
+    $(
+        "previewStage"
+    )
+        ?.querySelector(
+            ".stage-speech"
+        )
+        ?.remove();
+}
+
+
+function pulseStage() {
+
+    const stage =
+        $("previewStage");
+
+    if (!stage)
+        return;
+
+
+    stage.animate(
+        [
+            {
+                transform:
+                    "scale(1)"
+            },
+
+            {
+                transform:
+                    "scale(1.025)"
+            },
+
+            {
+                transform:
+                    "scale(1)"
+            }
+        ],
+        {
+            duration:
+                350
+        }
+    );
+}
+
+
+/* =========================================================
+   SOUND
+   ========================================================= */
+
+function playSound(name) {
+
+    try {
+
+        const AudioContext =
+            window.AudioContext ||
+            window.webkitAudioContext;
+
+
+        if (!AudioContext)
+            return;
+
+
+        const ctx =
+            new AudioContext();
+
+
+        const oscillator =
+            ctx.createOscillator();
+
+
+        const gain =
+            ctx.createGain();
+
+
+        const frequencies = {
+
+            Pop: 650,
+
+            Collect: 880,
+
+            Magic: 520,
+
+            Win: 1040,
+
+            Meow: 500,
+
+            Boom: 120,
+
+            Buzz: 180
+        };
+
+
+        oscillator.frequency.value =
+            frequencies[name] ||
+            600;
+
+
+        oscillator.type =
+            name === "Boom"
+                ? "sawtooth"
+                : "sine";
+
+
+        gain.gain.setValueAtTime(
+            0.0001,
+            ctx.currentTime
+        );
+
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.12,
+            ctx.currentTime + 0.01
+        );
+
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            ctx.currentTime + 0.18
+        );
+
+
+        oscillator.connect(
+            gain
+        );
+
+
+        gain.connect(
+            ctx.destination
+        );
+
+
+        oscillator.start();
+
+
+        oscillator.stop(
+            ctx.currentTime + 0.2
+        );
+
+    } catch (error) {
+
+        console.log(
+            "Sound unavailable",
+            error
+        );
+    }
 }
 
 
@@ -2557,1154 +3619,142 @@ function completeMission() {
         completedMissions.push(
             currentMission
         );
-
-        localStorage.setItem(
-            "auraPlusMissions",
-            JSON.stringify(
-                completedMissions
-            )
-        );
     }
 
 
-    const progress =
-        $("stepProgressBar");
+    localStorage.setItem(
+        "auraPlusMissions",
+        JSON.stringify(
+            completedMissions
+        )
+    );
 
-    if (progress) {
-
-        progress.style.width =
-            "100%";
-    }
-
-
-    if ($("stepStatus")) {
-
-        $("stepStatus").textContent =
-            `🏆 MISSION ${currentMission} COMPLETE!`;
-    }
-
-
-    const next =
-        $("nextLessonStep");
-
-    if (next) {
-
-        next.textContent =
-            "MISSION COMPLETE ✓";
-    }
-
-
-    clearHighlights();
 
     updateMissionProgress();
+
+
+    $("stepStatus").textContent =
+        "🏆 Mission complete!";
+
+
+    setTimeout(
+        () => {
+
+            showScreen(
+                "tutorialScreen"
+            );
+
+        },
+        700
+    );
 }
 
-
-/* =========================================================
-   MISSION PROGRESS
-   ========================================================= */
 
 function updateMissionProgress() {
 
     $$(".mission-card")
         .forEach(card => {
 
-            const number =
+            const mission =
                 Number(
                     card.dataset.mission
                 );
 
+
             card.classList.toggle(
                 "completed",
                 completedMissions.includes(
-                    number
+                    mission
                 )
             );
-
         });
-}
 
 
-/* =========================================================
-   BLOCK HIGHLIGHT FIX
-   ========================================================= */
-
-function highlightBlock(id) {
-
-    /*
-       Older code may call highlightBlock().
-       Keep it safe, but NEVER change category
-       automatically.
-    */
-
-    if (
-        selectedCategory !==
-        "motion"
-    ) {
-
-        /* intentionally do nothing */
-    }
-
-    highlightBlockOnly(id);
-}
+    const completed =
+        completedMissions.length;
 
 
-/* =========================================================
-   RUN CURRENT WORKSPACE
-   ========================================================= */
+    if ($("tutorialAura")) {
 
-function runWorkspace() {
-
-    if (!selectedSprite) {
-
-        showStepError(
-            "Select a sprite first."
-        );
-
-        return;
+        $("tutorialAura").textContent =
+            `${completed} / 7`;
     }
 
 
-    saveCurrentSpriteScript();
+    if ($("auraProgress")) {
 
-    lessonRunning = true;
-
-    lastRunCompleted = false;
-
-
-    const blocks =
-        workspaceBlocks.slice();
-
-
-    /*
-       Simple Scratch-like execution.
-       This does not fake completion:
-       it actually processes the blocks.
-    */
-
-    let index = 0;
-
-
-    function executeNext() {
-
-        if (
-            index >=
-            blocks.length
-        ) {
-
-            lessonRunning = false;
-
-            lastRunCompleted = true;
-
-            $("stepStatus").textContent =
-                "▶️ Script finished running.";
-
-            return;
-        }
-
-
-        const block =
-            blocks[index];
-
-
-        executeBlock(
-            block
-        );
-
-
-        index++;
-
-
-        lessonTimer =
-            setTimeout(
-                executeNext,
-                350
-            );
-    }
-
-
-    executeNext();
-}
-
-
-/* =========================================================
-   EXECUTE SCRATCH-LIKE BLOCK
-   ========================================================= */
-
-function executeBlock(block) {
-
-    if (!block) return;
-
-
-    const text =
-        block.text.toLowerCase();
-
-
-    /* -----------------------------------------
-       MOVE
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "move"
-    ) {
-
-        movePreviewSprite(
-            10,
-            0
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       CHANGE X
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "changex"
-    ) {
-
-        movePreviewSprite(
-            10,
-            0
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       CHANGE Y
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "changey"
-    ) {
-
-        movePreviewSprite(
-            0,
-            10
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       TURN
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "turn"
-    ) {
-
-        const player =
-            $("previewPlayer");
-
-        if (player) {
-
-            const current =
-                Number(
-                    player.dataset.rotation ||
-                    0
-                );
-
-            player.dataset.rotation =
-                current + 15;
-
-            player.style.transform =
-                `rotate(${current + 15}deg)`;
-        }
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       SAY
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "say"
-    ) {
-
-        showPreviewMessage(
-            "Hello!"
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       NEXT COSTUME
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "nextcostume"
-    ) {
-
-        cyclePreviewCostume();
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       SOUND
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "soundstart" ||
-        block.id ===
-        "soundwait"
-    ) {
-
-        playSound(
-            "Meow"
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       SCORE
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "changevar"
-    ) {
-
-        auraGame.score += 10;
-
-        updateGameHUD();
-
-        return;
-    }
-
-
-    /* -----------------------------------------
-       SET SCORE
-       ----------------------------------------- */
-
-    if (
-        block.id ===
-        "setvar"
-    ) {
-
-        auraGame.score = 0;
-
-        updateGameHUD();
-
-        return;
+        $("auraProgress").style.width =
+            `${(completed / 7) * 100}%`;
     }
 }
 
 
 /* =========================================================
-   PREVIEW MOVEMENT
+   RUN HINT
    ========================================================= */
 
-function movePreviewSprite(
-    dx,
-    dy
-) {
+function updateRunHint() {
 
-    const player =
-        $("previewPlayer");
-
-    if (!player) return;
+    const count =
+        workspaceBlocks.length;
 
 
-    let x =
-        Number(
-            player.dataset.x || 50
-        );
-
-    let y =
-        Number(
-            player.dataset.y || 50
-        );
-
-
-    x += dx;
-
-    y += dy;
-
-
-    x =
-        Math.max(
-            5,
-            Math.min(
-                95,
-                x
-            )
-        );
-
-    y =
-        Math.max(
-            5,
-            Math.min(
-                95,
-                y
-            )
-        );
-
-
-    player.dataset.x =
-        x;
-
-    player.dataset.y =
-        y;
-
-
-    player.style.left =
-        `${x}%`;
-
-    player.style.top =
-        `${y}%`;
-}
-
-
-/* =========================================================
-   PREVIEW COSTUMES
-   ========================================================= */
-
-function updateStageCostume(
-    costume
-) {
-
-    selectedAsset =
-        costume;
-
-    const player =
-        $("previewPlayer");
-
-    if (!player) return;
-
-
-    player.dataset.costume =
-        costume;
-
-
-    /*
-       Visual costume changes without
-       automatically choosing the costume.
-    */
-
-    if (
-        costume
-            .toLowerCase()
-            .includes("glow")
-    ) {
-
-        player.classList.add(
-            "glowing"
-        );
-
-    } else {
-
-        player.classList.remove(
-            "glowing"
-        );
-    }
-}
-
-
-function cyclePreviewCostume() {
-
-    const data =
-        spriteAssets[
-            selectedSprite ||
-            "aura"
-        ];
-
-
-    const costumes =
-        data?.costumes || [];
-
-
-    if (!costumes.length)
+    if (!$("bottomHint"))
         return;
 
 
-    let current =
-        playerCostumeIndex();
-
-
-    current =
-        (current + 1) %
-        costumes.length;
-
-
-    updateStageCostume(
-        costumes[current]
-    );
-}
-
-
-function playerCostumeIndex() {
-
-    const player =
-        $("previewPlayer");
-
-    if (!player)
-        return 0;
-
-
-    const current =
-        player.dataset.costume;
-
-
-    const costumes =
-        spriteAssets[
-            selectedSprite ||
-            "aura"
-        ]?.costumes || [];
-
-
-    const index =
-        costumes.indexOf(
-            current
-        );
-
-
-    return index >= 0
-        ? index
-        : 0;
+    $("bottomHint").textContent =
+        count
+            ? `${count} block${count === 1 ? "" : "s"} ready — click RUN to test.`
+            : "Do the highlighted action.";
 }
 
 
 /* =========================================================
-   PREVIEW MESSAGE
+   REAL AURA PLUS GAME
    ========================================================= */
 
-function showPreviewMessage(
-    message
-) {
+let gameRunning = false;
 
-    const player =
-        $("previewPlayer");
+let gameAnimation = null;
 
-    if (!player) return;
+let lastHit = 0;
 
 
-    let bubble =
-        qs(".preview-speech");
+let auraGame = {
 
+    x: 12,
 
-    if (!bubble) {
+    y: 50,
 
-        bubble =
-            document.createElement(
-                "div"
-            );
+    score: 0,
 
-        bubble.className =
-            "preview-speech";
+    lives: 3,
 
-        player.parentElement
-            ?.appendChild(
-                bubble
-            );
-    }
+    collected: 0,
 
+    shadowX: 72,
 
-    bubble.textContent =
-        message;
-
-
-    bubble.classList.add(
-        "show"
-    );
-
-
-    setTimeout(
-        () => {
-
-            bubble.classList.remove(
-                "show"
-            );
-
-        },
-        1800
-    );
-}
+    shadowY: 50
+};
 
 
 /* =========================================================
-   SOUND
+   GAME START
    ========================================================= */
 
-function playSound(name) {
+function startGame() {
 
-    /*
-       Browser audio may require a user
-       interaction. We therefore create
-       a tiny oscillator only after a
-       real click.
-    */
+    stopGame();
 
-    try {
 
-        const AudioContext =
-            window.AudioContext ||
-            window.webkitAudioContext;
-
-        if (!AudioContext)
-            return;
-
-        const context =
-            new AudioContext();
-
-        const oscillator =
-            context.createOscillator();
-
-        const gain =
-            context.createGain();
-
-
-        const frequencies = {
-
-            Meow: 660,
-
-            Pop: 880,
-
-            Collect: 1040,
-
-            Boom: 130,
-
-            Buzz: 220,
-
-            Magic: 740,
-
-            Win: 1200
-        };
-
-
-        oscillator.frequency.value =
-            frequencies[name] ||
-            600;
-
-
-        oscillator.type =
-            name === "Boom"
-                ? "sawtooth"
-                : "sine";
-
-
-        gain.gain.setValueAtTime(
-            0.001,
-            context.currentTime
-        );
-
-        gain.gain.exponentialRampToValueAtTime(
-            0.15,
-            context.currentTime + 0.02
-        );
-
-        gain.gain.exponentialRampToValueAtTime(
-            0.001,
-            context.currentTime + 0.25
-        );
-
-
-        oscillator.connect(
-            gain
-        );
-
-        gain.connect(
-            context.destination
-        );
-
-
-        oscillator.start();
-
-        oscillator.stop(
-            context.currentTime +
-            0.25
-        );
-
-    } catch (error) {
-
-        console.log(
-            "Sound unavailable:",
-            error
-        );
-    }
-}
-
-
-/* =========================================================
-   CAPITALIZE
-   ========================================================= */
-
-function capitalize(value) {
-
-    if (!value)
-        return "";
-
-    return value.charAt(0)
-        .toUpperCase() +
-        value.slice(1);
-}
-
-
-/* =========================================================
-   UNDO
-   ========================================================= */
-
-function undoWorkspace() {
-
-    if (!selectedSprite)
-        return;
-
-
-    if (!undoStack.length)
-        return;
-
-
-    redoStack.push(
-        JSON.parse(
-            JSON.stringify(
-                workspaceBlocks
-            )
-        )
-    );
-
-
-    workspaceBlocks =
-        undoStack.pop();
-
-
-    saveCurrentSpriteScript();
-
-    renderWorkspace();
-}
-
-
-function redoWorkspace() {
-
-    if (!selectedSprite)
-        return;
-
-
-    if (!redoStack.length)
-        return;
-
-
-    undoStack.push(
-        JSON.parse(
-            JSON.stringify(
-                workspaceBlocks
-            )
-        )
-    );
-
-
-    workspaceBlocks =
-        redoStack.pop();
-
-
-    saveCurrentSpriteScript();
-
-    renderWorkspace();
-}
-
-
-/* =========================================================
-   TOOLBAR
-   ========================================================= */
-
-function setupToolbar() {
-
-    const undo =
-        qs(
-            '[title*="Undo"]'
-        );
-
-    const redo =
-        qs(
-            '[title*="Redo"]'
-        );
-
-
-    undo?.addEventListener(
-        "click",
-        undoWorkspace
-    );
-
-    redo?.addEventListener(
-        "click",
-        redoWorkspace
-    );
-
-
-    $("lessonFlag")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                runWorkspace();
-            }
-        );
-
-
-    $("lessonStop")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                stopWorkspace();
-            }
-        );
-
-
-    $("stageFlag")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                runWorkspace();
-            }
-        );
-
-
-    $("stageStop")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                stopWorkspace();
-            }
-        );
-}
-
-
-/* =========================================================
-   STOP WORKSPACE
-   ========================================================= */
-
-function stopWorkspace() {
-
-    if (lessonTimer) {
-
-        clearTimeout(
-            lessonTimer
-        );
-
-        lessonTimer = null;
-    }
-
-    lessonRunning = false;
-
-    $("stepStatus").textContent =
-        "⏹ Script stopped.";
-}
-
-
-/* =========================================================
-   STAGE SPRITE UPDATE
-   ========================================================= */
-
-function updateStageSprite() {
-
-    const player =
-        $("previewPlayer");
-
-    if (!player) return;
-
-
-    player.dataset.sprite =
-        selectedSprite || "";
-
-
-    const names = {
-
-        aura: "A",
-
-        shadow: "S",
-
-        orb: "✦",
-
-        portal: "◎",
-
-        star: "★"
-    };
-
-
-    player.textContent =
-        names[selectedSprite] ||
-        "?";
-}
-
-
-/* =========================================================
-   INIT
-   ========================================================= */
-
-function initializeAuraPlus() {
-
-    setupSprites();
-
-    setupCategories();
-
-    setupEditorTabs();
-
-    setupAssetTabs();
-
-    setupBackdrops();
-
-    setupLessonButton();
-
-    setupToolbar();
-
-    renderPalette();
-
-    renderWorkspace();
-
-    renderAssets();
-
-    renderBackdrops();
-
-    updateMissionProgress();
-
-
-    /*
-       IMPORTANT:
-       No sprite is automatically selected.
-       No category is automatically selected
-       for a lesson.
-       No backdrop is automatically selected.
-       No costume/sound is automatically
-       selected.
-    */
-
-    selectedSprite = null;
-
-    updateSpriteSelection();
-
-    renderWorkspace();
-}
-
-
-/* =========================================================
-   DOM READY
-   ========================================================= */
-
-if (
-    document.readyState ===
-    "loading"
-) {
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeAuraPlus
-    );
-
-} else {
-
-    initializeAuraPlus();
-}
-
-
-/* =========================================================
-   PART 2 ENDS HERE
-   ========================================================= */
-/* =========================================================
-   AURA PLUS — PART 3 / 3
-   GAME ENGINE + NAVIGATION + TOUCH + FINAL POLISH
-   ========================================================= */
-
-
-/* =========================================================
-   AURA PLUS GAME
-   ========================================================= */
-
-const gameWorld =
-    () => $("gameWorld");
-
-
-const playerElement =
-    () => $("player");
-
-
-const shadowElement =
-    () => $("shadow");
-
-
-const portalElement =
-    () => $("portal");
-
-
-/* =========================================================
-   RESET GAME
-   ========================================================= */
-
-function resetGameObjects() {
-
-    const world =
-        gameWorld();
-
-    if (!world) return;
-
-
-    /*
-       Remove old generated game objects.
-    */
-
-    world
-        .querySelectorAll(
-            ".aura-orb,.game-portal,.game-shadow"
-        )
-        .forEach(
-            element =>
-                element.remove()
-        );
-
-
-    /*
-       Create 5 Aura Orbs.
-    */
-
-    const orbPositions = [
-
-        { x: 20, y: 20 },
-
-        { x: 48, y: 22 },
-
-        { x: 75, y: 30 },
-
-        { x: 32, y: 68 },
-
-        { x: 70, y: 72 }
-    ];
-
-
-    orbPositions.forEach(
-        (position,index) => {
-
-            const orb =
-                document.createElement("div");
-
-            orb.className =
-                "aura-orb";
-
-            orb.dataset.index =
-                index;
-
-            orb.dataset.collected =
-                "false";
-
-            orb.style.left =
-                `${position.x}%`;
-
-            orb.style.top =
-                `${position.y}%`;
-
-            orb.innerHTML =
-                "✦";
-
-            world.appendChild(
-                orb
-            );
-        }
-    );
-
-
-    /*
-       Create portal.
-    */
-
-    const portal =
-        document.createElement("div");
-
-    portal.id =
-        "portal";
-
-    portal.className =
-        "game-portal";
-
-    portal.style.left =
-        "88%";
-
-    portal.style.top =
-        "50%";
-
-    portal.innerHTML =
-        "◎";
-
-    portal.style.opacity =
-        "0.25";
-
-    world.appendChild(
-        portal
-    );
-
-
-    /*
-       Create Shadow.
-    */
-
-    const shadow =
-        document.createElement("div");
-
-    shadow.id =
-        "shadow";
-
-    shadow.className =
-        "game-shadow";
-
-    shadow.style.left =
-        "72%";
-
-    shadow.style.top =
-        "50%";
-
-    shadow.innerHTML =
-        "☠";
-
-    world.appendChild(
-        shadow
-    );
-
-
-    /*
-       Reset player.
-    */
-
-    const player =
-        playerElement();
-
-    if (player) {
-
-        player.style.left =
-            "10%";
-
-        player.style.top =
-            "50%";
-
-        player.dataset.x =
-            "10";
-
-        player.dataset.y =
-            "50";
-    }
+    gameRunning =
+        true;
 
 
     auraGame = {
 
-        x: 10,
+        x: 12,
 
         y: 50,
 
@@ -3720,9 +3770,136 @@ function resetGameObjects() {
     };
 
 
+    resetGameObjects();
+
     updateGameHUD();
 
-    gameRunning = false;
+
+    $("gameObjective").textContent =
+        "COLLECT 5 AURA ORBS → REACH THE PORTAL";
+
+
+    $("gameMessage")
+        ?.classList.add(
+            "hidden"
+        );
+
+
+    gameAnimation =
+        requestAnimationFrame(
+            gameLoop
+        );
+}
+
+
+function stopGame() {
+
+    gameRunning =
+        false;
+
+
+    if (gameAnimation) {
+
+        cancelAnimationFrame(
+            gameAnimation
+        );
+
+        gameAnimation =
+            null;
+    }
+}
+
+
+/* =========================================================
+   GAME OBJECTS
+   ========================================================= */
+
+function resetGameObjects() {
+
+    const positions = [
+
+        [18,25],
+
+        [38,72],
+
+        [57,28],
+
+        [72,68],
+
+        [84,34]
+    ];
+
+
+    $$(".aura-orb")
+        .forEach(
+            (orb,index) => {
+
+                const position =
+                    positions[index];
+
+
+                orb.classList.remove(
+                    "collected"
+                );
+
+
+                orb.style.display =
+                    "block";
+
+
+                orb.style.left =
+                    `${position[0]}%`;
+
+
+                orb.style.top =
+                    `${position[1]}%`;
+            }
+        );
+
+
+    const player =
+        $("player");
+
+
+    if (player) {
+
+        player.style.left =
+            `${auraGame.x}%`;
+
+        player.style.top =
+            `${auraGame.y}%`;
+    }
+
+
+    const portal =
+        $("portal");
+
+
+    if (portal) {
+
+        portal.style.opacity =
+            "0.35";
+
+        portal.style.borderColor =
+            "#475569";
+
+        portal.style.boxShadow =
+            "";
+    }
+
+
+    const shadow =
+        $("shadow");
+
+
+    if (shadow) {
+
+        shadow.style.left =
+            "72%";
+
+        shadow.style.top =
+            "50%";
+    }
 }
 
 
@@ -3732,87 +3909,18 @@ function resetGameObjects() {
 
 function updateGameHUD() {
 
-    const score =
-        $("gameScore");
+    if ($("auraScore")) {
 
-    const lives =
-        $("gameLives");
-
-    const collected =
-        $("gameCollected");
-
-
-    if (score) {
-
-        score.textContent =
+        $("auraScore").textContent =
             auraGame.score;
     }
 
 
-    if (lives) {
+    if ($("lives")) {
 
-        lives.textContent =
+        $("lives").textContent =
             auraGame.lives;
     }
-
-
-    if (collected) {
-
-        collected.textContent =
-            `${auraGame.collected}/5`;
-    }
-
-
-    /*
-       Support alternative IDs too.
-    */
-
-    qs("#scoreValue") &&
-        (qs("#scoreValue").textContent =
-            auraGame.score);
-
-    qs("#livesValue") &&
-        (qs("#livesValue").textContent =
-            auraGame.lives);
-
-    qs("#orbCount") &&
-        (qs("#orbCount").textContent =
-            `${auraGame.collected}/5`);
-}
-
-
-/* =========================================================
-   START GAME
-   ========================================================= */
-
-function startAuraPlusGame() {
-
-    resetGameObjects();
-
-    gameRunning = true;
-
-    lastHit = 0;
-
-
-    const world =
-        gameWorld();
-
-    if (!world) return;
-
-
-    /*
-       Start animation loop.
-    */
-
-    if (gameAnimation) {
-
-        cancelAnimationFrame(
-            gameAnimation
-        );
-    }
-
-
-    gameLoop();
 }
 
 
@@ -3832,7 +3940,7 @@ function gameLoop() {
 
     checkShadowCollision();
 
-    checkPortalCollision();
+    checkPortal();
 
 
     gameAnimation =
@@ -3846,7 +3954,7 @@ function gameLoop() {
    MOVE PLAYER
    ========================================================= */
 
-function moveGamePlayer(
+function movePlayer(
     dx,
     dy
 ) {
@@ -3855,58 +3963,41 @@ function moveGamePlayer(
         return;
 
 
-    auraGame.x += dx;
-
-    auraGame.y += dy;
-
-
-    /*
-       Keep player inside game area.
-    */
-
     auraGame.x =
-        Math.max(
-            4,
-            Math.min(
-                94,
-                auraGame.x
-            )
+        clamp(
+            auraGame.x + dx,
+            5,
+            94
         );
 
 
     auraGame.y =
-        Math.max(
+        clamp(
+            auraGame.y + dy,
             8,
-            Math.min(
-                88,
-                auraGame.y
-            )
+            90
         );
 
 
     const player =
-        playerElement();
+        $("player");
 
-    if (!player) return;
+
+    if (!player)
+        return;
 
 
     player.style.left =
         `${auraGame.x}%`;
 
+
     player.style.top =
         `${auraGame.y}%`;
-
-
-    player.dataset.x =
-        auraGame.x;
-
-    player.dataset.y =
-        auraGame.y;
 }
 
 
 /* =========================================================
-   KEYBOARD CONTROLS
+   KEYBOARD
    ========================================================= */
 
 function setupGameControls() {
@@ -3925,94 +4016,60 @@ function setupGameControls() {
 
 
             switch (
-                event.key.toLowerCase()
+                event.key
             ) {
 
-                case "arrowleft":
+                case "ArrowLeft":
                 case "a":
+                case "A":
+
                     dx = -2;
+
                     break;
 
-                case "arrowright":
+
+                case "ArrowRight":
                 case "d":
+                case "D":
+
                     dx = 2;
+
                     break;
 
-                case "arrowup":
+
+                case "ArrowUp":
                 case "w":
+                case "W":
+
                     dy = -2;
+
                     break;
 
-                case "arrowdown":
+
+                case "ArrowDown":
                 case "s":
+                case "S":
+
                     dy = 2;
+
                     break;
+
 
                 default:
+
                     return;
             }
 
 
             event.preventDefault();
 
-            moveGamePlayer(
+
+            movePlayer(
                 dx,
                 dy
             );
         }
     );
-
-
-    /*
-       Touch / smartboard controls.
-    */
-
-    $$(".game-control")
-        .forEach(button => {
-
-            const direction =
-                button.dataset.direction;
-
-
-            const move =
-                () => {
-
-                    const movement = {
-
-                        left: [-3, 0],
-
-                        right: [3, 0],
-
-                        up: [0, -3],
-
-                        down: [0, 3]
-                    };
-
-
-                    const [dx,dy] =
-                        movement[
-                            direction
-                        ] || [0,0];
-
-
-                    moveGamePlayer(
-                        dx,
-                        dy
-                    );
-                };
-
-
-            button.addEventListener(
-                "pointerdown",
-                event => {
-
-                    event.preventDefault();
-
-                    move();
-                }
-            );
-
-        });
 }
 
 
@@ -4022,62 +4079,52 @@ function setupGameControls() {
 
 function moveShadow() {
 
-    const shadow =
-        shadowElement();
-
-    if (!shadow)
-        return;
-
-
-    /*
-       Simple chasing AI.
-    */
-
-    const differenceX =
+    const dx =
         auraGame.x -
         auraGame.shadowX;
 
 
-    const differenceY =
+    const dy =
         auraGame.y -
         auraGame.shadowY;
 
 
     const distance =
         Math.sqrt(
-            differenceX * differenceX +
-            differenceY * differenceY
+            dx * dx +
+            dy * dy
         );
 
 
-    /*
-       Shadow becomes more dangerous
-       as the game progresses.
-    */
-
-    const speed =
-        auraGame.collected >= 3
-            ? 0.18
-            : 0.10;
-
-
-    if (distance > 0) {
+    if (
+        distance >
+        2
+    ) {
 
         auraGame.shadowX +=
-            (differenceX / distance) *
-            speed;
+            (dx / distance) *
+            0.06;
+
 
         auraGame.shadowY +=
-            (differenceY / distance) *
-            speed;
+            (dy / distance) *
+            0.06;
     }
 
 
-    shadow.style.left =
-        `${auraGame.shadowX}%`;
+    const shadow =
+        $("shadow");
 
-    shadow.style.top =
-        `${auraGame.shadowY}%`;
+
+    if (shadow) {
+
+        shadow.style.left =
+            `${auraGame.shadowX}%`;
+
+
+        shadow.style.top =
+            `${auraGame.shadowY}%`;
+    }
 }
 
 
@@ -4087,139 +4134,152 @@ function moveShadow() {
 
 function checkOrbCollisions() {
 
-    const orbs =
-        $$(".aura-orb");
+    const player =
+        $("player");
 
 
-    orbs.forEach(
-        orb => {
-
-            if (
-                orb.dataset.collected ===
-                "true"
-            )
-                return;
-
-
-            const x =
-                parseFloat(
-                    orb.style.left
-                );
-
-            const y =
-                parseFloat(
-                    orb.style.top
-                );
-
-
-            const distance =
-                Math.sqrt(
-                    Math.pow(
-                        auraGame.x - x,
-                        2
-                    ) +
-                    Math.pow(
-                        auraGame.y - y,
-                        2
-                    )
-                );
-
-
-            if (
-                distance <
-                7
-            ) {
-
-                collectOrb(
-                    orb
-                );
-            }
-        }
-    );
-}
-
-
-/* =========================================================
-   COLLECT ORB
-   ========================================================= */
-
-function collectOrb(orb) {
-
-    if (
-        orb.dataset.collected ===
-        "true"
-    )
+    if (!player)
         return;
 
 
-    orb.dataset.collected =
-        "true";
+    const playerRect =
+        player.getBoundingClientRect();
 
 
-    orb.classList.add(
-        "collected"
-    );
+    $$(".aura-orb")
+        .forEach(
+            orb => {
+
+                if (
+                    orb.style.display ===
+                    "none"
+                )
+                    return;
+
+
+                if (
+                    rectanglesTouch(
+                        playerRect,
+                        orb.getBoundingClientRect()
+                    )
+                ) {
+
+                    collectOrb(
+                        orb
+                    );
+                }
+            }
+        );
+}
+
+
+function collectOrb(orb) {
+
+    orb.style.display =
+        "none";
+
+
+    auraGame.score +=
+        Number(
+            orb.dataset.value ||
+            10
+        );
 
 
     auraGame.collected++;
 
-    auraGame.score += 10;
 
+    updateGameHUD();
 
     playSound(
         "Collect"
     );
 
 
-    updateGameHUD();
-
-
-    /*
-       Unlock portal after all 5.
-    */
-
     if (
-        auraGame.collected >= 5
+        auraGame.collected >=
+        5
     ) {
 
         unlockPortal();
+
+    } else {
+
+        $("gameObjective").textContent =
+            `COLLECT ${5 - auraGame.collected} MORE ORB${5 - auraGame.collected === 1 ? "" : "S"}`;
     }
 }
 
 
 /* =========================================================
-   PORTAL UNLOCK
+   PORTAL
    ========================================================= */
 
 function unlockPortal() {
 
     const portal =
-        portalElement();
+        $("portal");
+
 
     if (!portal)
         return;
-
-
-    portal.classList.add(
-        "unlocked"
-    );
 
 
     portal.style.opacity =
         "1";
 
 
-    portal.style.pointerEvents =
-        "auto";
+    portal.style.borderColor =
+        "#a78bfa";
 
 
-    portal.innerHTML =
-        "✦";
+    portal.style.boxShadow =
+        "0 0 35px rgba(167,139,250,.8)";
 
 
-    showGameMessage(
-        "PORTAL UNLOCKED! ✨"
+    $("gameObjective").textContent =
+        "PORTAL UNLOCKED → REACH IT!";
+
+
+    playSound(
+        "Magic"
     );
+}
+
+
+function checkPortal() {
+
+    if (
+        auraGame.collected <
+        5
+    )
+        return;
+
+
+    const player =
+        $("player");
+
+
+    const portal =
+        $("portal");
+
+
+    if (
+        !player ||
+        !portal
+    )
+        return;
+
+
+    if (
+        rectanglesTouch(
+            player.getBoundingClientRect(),
+            portal.getBoundingClientRect()
+        )
+    ) {
+
+        winGame();
+    }
 }
 
 
@@ -4229,142 +4289,91 @@ function unlockPortal() {
 
 function checkShadowCollision() {
 
+    const player =
+        $("player");
+
+
+    const shadow =
+        $("shadow");
+
+
+    if (
+        !player ||
+        !shadow
+    )
+        return;
+
+
+    if (
+        !rectanglesTouch(
+            player.getBoundingClientRect(),
+            shadow.getBoundingClientRect()
+        )
+    )
+        return;
+
+
     const now =
         Date.now();
 
 
     if (
         now - lastHit <
-        1200
+        1500
     )
         return;
 
 
-    const distance =
-        Math.sqrt(
-            Math.pow(
-                auraGame.x -
-                auraGame.shadowX,
-                2
-            ) +
-            Math.pow(
-                auraGame.y -
-                auraGame.shadowY,
-                2
-            )
-        );
+    lastHit =
+        now;
 
-
-    if (
-        distance <
-        7
-    ) {
-
-        lastHit =
-            now;
-
-        loseLife();
-    }
-}
-
-
-/* =========================================================
-   LOSE LIFE
-   ========================================================= */
-
-function loseLife() {
 
     auraGame.lives--;
 
+
     updateGameHUD();
 
-
-    const player =
-        playerElement();
-
-    player?.classList.add(
-        "hit"
+    playSound(
+        "Boom"
     );
 
-
-    setTimeout(
-        () => {
-
-            player?.classList.remove(
-                "hit"
-            );
-
-        },
-        400
-    );
-
-
-    if (
-        auraGame.lives <= 0
-    ) {
-
-        gameOver();
-
-        return;
-    }
-
-
-    /*
-       Respawn player away from Shadow.
-    */
 
     auraGame.x =
-        10;
+        12;
 
     auraGame.y =
         50;
 
 
-    moveGamePlayer(
-        0,
+    player.style.left =
+        "12%";
+
+
+    player.style.top =
+        "50%";
+
+
+    if (
+        auraGame.lives <=
         0
-    );
+    ) {
 
-
-    showGameMessage(
-        `⚡ HIT! ${auraGame.lives} lives left`
-    );
+        gameOver();
+    }
 }
 
 
-/* =========================================================
-   PORTAL COLLISION
-   ========================================================= */
+function rectanglesTouch(
+    a,
+    b
+) {
 
-function checkPortalCollision() {
-
-    if (
-        auraGame.collected <
-        5
-    )
-        return;
-
-
-    const distance =
-        Math.sqrt(
-            Math.pow(
-                auraGame.x - 88,
-                2
-            ) +
-            Math.pow(
-                auraGame.y - 50,
-                2
-            )
-        );
-
-
-    if (
-        distance <
-        8
-    ) {
-
-        winAuraPlus();
-    }
+    return !(
+        a.right < b.left ||
+        a.left > b.right ||
+        a.bottom < b.top ||
+        a.top > b.bottom
+    );
 }
 
 
@@ -4372,13 +4381,14 @@ function checkPortalCollision() {
    WIN
    ========================================================= */
 
-function winAuraPlus() {
+function winGame() {
 
     if (!gameRunning)
         return;
 
 
-    gameRunning = false;
+    gameRunning =
+        false;
 
 
     if (gameAnimation) {
@@ -4387,7 +4397,8 @@ function winAuraPlus() {
             gameAnimation
         );
 
-        gameAnimation = null;
+        gameAnimation =
+            null;
     }
 
 
@@ -4396,20 +4407,173 @@ function winAuraPlus() {
     );
 
 
-    showGameMessage(
-        "🏆 AURA PLUS COMPLETE!"
+    const message =
+        $("gameMessage");
+
+
+    if (!message)
+        return;
+
+
+    message.innerHTML = `
+        <div>
+
+            <div
+                style="
+                    font-size:14px;
+                    color:#a78bfa;
+                    letter-spacing:3px;
+                "
+            >
+                AURA PLUS
+            </div>
+
+            <div
+                style="
+                    font-size:42px;
+                    margin:10px 0;
+                "
+            >
+                🏆 YOU WIN!
+            </div>
+
+            <div
+                style="
+                    font-size:15px;
+                    color:#cbd5e1;
+                "
+            >
+                50 AURA collected • Portal reached
+            </div>
+
+            <button
+                onclick="finishGame()"
+                style="
+                    margin-top:22px;
+                    padding:12px 22px;
+                    border:0;
+                    border-radius:8px;
+                    background:#7c3aed;
+                    color:white;
+                    font-weight:900;
+                    cursor:pointer;
+                "
+            >
+                CONTINUE →
+            </button>
+
+        </div>
+    `;
+
+
+    message.classList.remove(
+        "hidden"
+    );
+}
+
+
+function gameOver() {
+
+    gameRunning =
+        false;
+
+
+    const message =
+        $("gameMessage");
+
+
+    if (!message)
+        return;
+
+
+    message.innerHTML = `
+        <div>
+
+            <div
+                style="
+                    font-size:42px;
+                "
+            >
+                💥 GAME OVER
+            </div>
+
+            <div
+                style="
+                    font-size:15px;
+                    color:#cbd5e1;
+                    margin-top:10px;
+                "
+            >
+                Don't worry — every game can be improved.
+            </div>
+
+            <button
+                onclick="startGame()"
+                style="
+                    margin-top:22px;
+                    padding:12px 22px;
+                    border:0;
+                    border-radius:8px;
+                    background:#4c97ff;
+                    color:white;
+                    font-weight:900;
+                    cursor:pointer;
+                "
+            >
+                TRY AGAIN
+            </button>
+
+        </div>
+    `;
+
+
+    message.classList.remove(
+        "hidden"
+    );
+}
+
+
+/* =========================================================
+   LESSON → ACTUAL GAME
+   ========================================================= */
+
+function launchAuraPlusFromLesson() {
+
+    stopLessonPreview();
+
+    startGame();
+
+    showScreen(
+        "gameScreen"
     );
 
 
-    /*
-       Mark Mission 7 complete.
-    */
+    $("gameObjective").textContent =
+        "COLLECT 5 AURA ORBS → REACH THE PORTAL";
+}
 
-    if (
-        !completedMissions.includes(7)
-    ) {
 
-        completedMissions.push(7);
+/* =========================================================
+   FINISH GAME
+   ========================================================= */
+
+window.finishGame =
+    function () {
+
+        stopGame();
+
+
+        if (
+            !completedMissions.includes(
+                7
+            )
+        ) {
+
+            completedMissions.push(
+                7
+            );
+        }
+
 
         localStorage.setItem(
             "auraPlusMissions",
@@ -4417,218 +4581,44 @@ function winAuraPlus() {
                 completedMissions
             )
         );
-    }
 
 
-    lastRunCompleted = true;
-
-    updateMissionProgress();
+        updateMissionProgress();
 
 
-    /*
-       Allow the lesson's final NEXT
-       to finish.
-    */
-
-    setTimeout(
-        () => {
-
-            if (
-                currentMission === 7
-            ) {
-
-                $("stepStatus").textContent =
-                    "🏆 You built and completed AURA PLUS!";
-
-            }
-
-        },
-        500
-    );
-}
+        showScreen(
+            "finalScreen"
+        );
+    };
 
 
 /* =========================================================
-   GAME OVER
-   ========================================================= */
-
-function gameOver() {
-
-    gameRunning = false;
-
-
-    if (gameAnimation) {
-
-        cancelAnimationFrame(
-            gameAnimation
-        );
-
-        gameAnimation = null;
-    }
-
-
-    showGameMessage(
-        "💥 GAME OVER — Press the flag to retry."
-    );
-}
-
-
-/* =========================================================
-   GAME MESSAGE
-   ========================================================= */
-
-function showGameMessage(
-    message
-) {
-
-    let messageBox =
-        $("gameMessage");
-
-
-    if (!messageBox) {
-
-        const world =
-            gameWorld();
-
-        if (!world)
-            return;
-
-
-        messageBox =
-            document.createElement(
-                "div"
-            );
-
-        messageBox.id =
-            "gameMessage";
-
-        messageBox.className =
-            "game-message";
-
-        world.appendChild(
-            messageBox
-        );
-    }
-
-
-    messageBox.textContent =
-        message;
-
-
-    messageBox.classList.add(
-        "show"
-    );
-
-
-    setTimeout(
-        () => {
-
-            messageBox.classList.remove(
-                "show"
-            );
-
-        },
-        2200
-    );
-}
-
-
-/* =========================================================
-   GAME BUTTON
-   ========================================================= */
-
-function setupGameButtons() {
-
-    const flag =
-        $("gameFlag");
-
-
-    flag?.addEventListener(
-        "click",
-        () => {
-
-            startAuraPlusGame();
-        }
-    );
-
-
-    /*
-       Existing stage green flag
-       should also launch the actual
-       game when Mission 7 is active.
-    */
-
-    $("stageFlag")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                if (
-                    currentMission ===
-                    7
-                ) {
-
-                    startAuraPlusGame();
-
-                } else {
-
-                    runWorkspace();
-                }
-            }
-        );
-
-
-    $("lessonFlag")
-        ?.addEventListener(
-            "click",
-            () => {
-
-                if (
-                    currentMission ===
-                    7 &&
-                    currentStep ===
-                    lessons[7].steps.length - 1
-                ) {
-
-                    startAuraPlusGame();
-
-                } else {
-
-                    runWorkspace();
-                }
-            }
-        );
-}
-
-
-/* =========================================================
-   BACK TO MISSIONS
+   NAVIGATION
    ========================================================= */
 
 function setupNavigation() {
 
-    $("backToMissions")
+    $("playGameButton")
         ?.addEventListener(
             "click",
             () => {
 
-                stopWorkspace();
-
-                gameRunning =
-                    false;
-
-                if (gameAnimation) {
-
-                    cancelAnimationFrame(
-                        gameAnimation
-                    );
-
-                    gameAnimation =
-                        null;
-                }
+                startGame();
 
                 showScreen(
-                    "missionsScreen"
+                    "gameScreen"
+                );
+            }
+        );
+
+
+    $("tutorialButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                showScreen(
+                    "tutorialScreen"
                 );
 
                 updateMissionProgress();
@@ -4636,9 +4626,19 @@ function setupNavigation() {
         );
 
 
-    /*
-       Reveal button
-    */
+    $("exitGame")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopGame();
+
+                showScreen(
+                    "introScreen"
+                );
+            }
+        );
+
 
     $("revealButton")
         ?.addEventListener(
@@ -4646,7 +4646,7 @@ function setupNavigation() {
             () => {
 
                 showScreen(
-                    "missionsScreen"
+                    "tutorialScreen"
                 );
 
                 updateMissionProgress();
@@ -4654,102 +4654,137 @@ function setupNavigation() {
         );
 
 
-    /*
-       Start / enter button.
-    */
-
-    $("startButton")
+    $("secretContinue")
         ?.addEventListener(
             "click",
             () => {
 
                 showScreen(
-                    "missionsScreen"
+                    "tutorialScreen"
                 );
             }
         );
 
 
-    /*
-       Mission cards.
-    */
+    $("backToMissions")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopLessonPreview();
+
+                showScreen(
+                    "tutorialScreen"
+                );
+            }
+        );
+
+
+    $("replayButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                showScreen(
+                    "introScreen"
+                );
+            }
+        );
+
 
     $$(".mission-card")
-        .forEach(card => {
+        .forEach(
+            card => {
 
-            card.addEventListener(
-                "click",
-                () => {
+                card.addEventListener(
+                    "click",
+                    () => {
 
-                    const mission =
-                        Number(
-                            card.dataset.mission
+                        openMission(
+                            Number(
+                                card.dataset.mission
+                            )
                         );
-
-                    if (!mission)
-                        return;
-
-                    openMission(
-                        mission
-                    );
-                }
-            );
-
-        });
+                    }
+                );
+            }
+        );
 }
 
 
 /* =========================================================
-   GAME INITIALIZATION
+   INITIALIZATION
    ========================================================= */
 
-function initializeGame() {
-
-    resetGameObjects();
-
-    setupGameControls();
-
-    setupGameButtons();
-}
-
-
-/* =========================================================
-   FINAL INITIALIZATION
-   ========================================================= */
-
-function finalAuraInitialization() {
-
-    initializeGame();
+function initialize() {
 
     setupNavigation();
 
-    updateMissionProgress();
+    setupCategories();
+
+    setupEditorTabs();
+
+    setupSprites();
+
+    setupAssets();
+
+    setupBackdrops();
+
+    setupRunButtons();
+
+    setupLessonButton();
+
+    setupUndoRedo();
+
+    setupGameControls();
+
 
     /*
-       Make sure the lesson starts
-       with no accidental sprite selection.
+       Initial UI only.
+       NO lesson action is performed.
     */
 
-    selectedSprite = null;
+    selectedSprite =
+        null;
 
-    updateSpriteSelection();
+
+    selectedCategory =
+        "motion";
+
+
+    selectedAssetType =
+        "costumes";
+
+
+    selectedBackdrop =
+        "space";
+
+
+    currentEditorTab =
+        "code";
+
+
+    renderPalette();
+
+    renderAssets();
+
+    renderBackdrops();
 
     renderWorkspace();
 
+    updateSpriteSelection();
 
-    /*
-       Default backdrop visual only.
-       It is NOT counted as a student action.
-    */
+    updateMissionProgress();
 
-    selectBackdropVisual(
-        selectedBackdrop
+
+    showScreen(
+        "introScreen"
     );
 }
 
 
 /* =========================================================
-   SAFE FINAL START
+   START
    ========================================================= */
 
 if (
@@ -4759,75 +4794,15 @@ if (
 
     document.addEventListener(
         "DOMContentLoaded",
-        finalAuraInitialization
+        initialize
     );
 
 } else {
 
-    finalAuraInitialization();
+    initialize();
 }
 
 
 /* =========================================================
-   TOUCH FRIENDLY EXTRA
-   ========================================================= */
-
-document.addEventListener(
-    "pointerdown",
-    event => {
-
-        const target =
-            event.target.closest(
-                ".scratch-block,.sprite-card,.asset-item,.backdrop-card,.project-tab"
-            );
-
-
-        if (!target)
-            return;
-
-
-        /*
-           Prevent accidental double activation
-           on touch screens.
-        */
-
-        target.style.transform =
-            "scale(.97)";
-
-
-        setTimeout(
-            () => {
-
-                target.style.transform =
-                    "";
-
-            },
-            100
-        );
-    }
-);
-
-
-/* =========================================================
-   FINAL SAFETY
-   ========================================================= */
-
-window.addEventListener(
-    "beforeunload",
-    () => {
-
-        saveCurrentSpriteScript();
-
-        localStorage.setItem(
-            "auraPlusMissions",
-            JSON.stringify(
-                completedMissions
-            )
-        );
-    }
-);
-
-
-/* =========================================================
-   AURA PLUS — END
+   END
    ========================================================= */
