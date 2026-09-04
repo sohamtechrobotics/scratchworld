@@ -3,48 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>AURA PLUS — Scratch Game Lab</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
 <!-- =========================================================
-     INTRO
+     INTRO SCREEN
 ========================================================= -->
 
 <section id="introScreen" class="screen active">
 
+    <div class="intro-bg-glow"></div>
+
     <div class="intro-content">
 
-        <div class="badge">SCRATCH GAME LAB</div>
+        <div class="eyebrow">
+            SCRATCH 3 • CLASS 5 • GAME LAB
+        </div>
 
-        <h1>AURA <span>PLUS</span></h1>
+        <h1>
+            AURA <span>PLUS</span>
+        </h1>
+
+        <div class="intro-line"></div>
 
         <p class="tagline">
-            YOU DON'T JUST PLAY THE GAME.<br>
+            YOU DON'T JUST PLAY THE GAME.
             <strong>YOU BUILD IT.</strong>
         </p>
 
         <p class="intro-description">
-            Learn Scratch by building your own game —
-            one real Scratch block at a time.
+            Learn Scratch by building a real game —
+            one block, one sprite and one idea at a time.
         </p>
 
         <div class="intro-buttons">
 
             <button id="playGameButton" class="primary-button">
-                ▶ PLAY AURA PLUS
+                <span>▶</span>
+                PLAY AURA PLUS
             </button>
 
             <button id="tutorialButton" class="secondary-button">
-                🧩 LEARN SCRATCH
+                <span>🧩</span>
+                BUILD WITH SCRATCH
             </button>
 
         </div>
 
-        <div class="intro-note">
-            Class 5 • Scratch 3 • Game Building
+        <div class="intro-footer">
+            <span>CLASS 5</span>
+            <span>•</span>
+            <span>SCRATCH 3</span>
+            <span>•</span>
+            <span>GAME BUILDING</span>
         </div>
 
     </div>
@@ -53,27 +69,34 @@
 
 
 <!-- =========================================================
-     GAME
+     AURA PLUS GAME
 ========================================================= -->
 
 <section id="gameScreen" class="screen hidden">
 
     <header class="game-header">
 
-        <div class="game-logo">
-            AURA <span>PLUS</span>
+        <div class="game-brand">
+            <div class="brand-icon">A</div>
+
+            <div>
+                <strong>AURA <span>PLUS</span></strong>
+                <small>GAME LAB</small>
+            </div>
         </div>
 
         <div class="game-stats">
 
-            <div class="stat">
+            <div class="game-stat">
                 <span>AURA</span>
                 <strong id="auraScore">0</strong>
+                <small>/ 50</small>
             </div>
 
-            <div class="stat">
-                <span>❤️</span>
+            <div class="game-stat lives-stat">
+                <span>LIVES</span>
                 <strong id="lives">3</strong>
+                <small>❤️</small>
             </div>
 
         </div>
@@ -87,29 +110,83 @@
 
     <main id="gameWorld">
 
-        <div id="gameObjective">
-            COLLECT THE AURA ORBS!
+        <div class="game-topbar">
+
+            <div id="gameObjective">
+                COLLECT ALL 5 AURA ORBS
+            </div>
+
+            <div class="game-controls-hint">
+                WASD / ARROWS
+            </div>
+
         </div>
 
-        <div id="player" class="game-sprite">
+
+        <!-- Player -->
+
+        <div id="player" class="game-sprite player-sprite">
             A
         </div>
 
-        <div class="aura-orb" data-value="10"></div>
-        <div class="aura-orb" data-value="10"></div>
-        <div class="aura-orb" data-value="10"></div>
-        <div class="aura-orb" data-value="10"></div>
-        <div class="aura-orb" data-value="10"></div>
+
+        <!-- Orbs -->
+
+        <div
+            class="aura-orb"
+            data-value="10"
+            style="left:18%; top:25%;">
+        </div>
+
+        <div
+            class="aura-orb"
+            data-value="10"
+            style="left:38%; top:72%;">
+        </div>
+
+        <div
+            class="aura-orb"
+            data-value="10"
+            style="left:57%; top:28%;">
+        </div>
+
+        <div
+            class="aura-orb"
+            data-value="10"
+            style="left:72%; top:68%;">
+        </div>
+
+        <div
+            class="aura-orb"
+            data-value="10"
+            style="left:84%; top:34%;">
+        </div>
+
+
+        <!-- Shadow -->
 
         <div id="shadow" class="game-enemy">
             👾
         </div>
 
+
+        <!-- Portal -->
+
         <div id="portal">
+
+            <div class="portal-core"></div>
+
             <span>PORTAL</span>
+
         </div>
 
-        <div id="gameMessage" class="game-message hidden"></div>
+
+        <!-- Game message -->
+
+        <div
+            id="gameMessage"
+            class="game-message hidden">
+        </div>
 
     </main>
 
@@ -122,26 +199,33 @@
 
 <section id="secretScreen" class="screen hidden">
 
+    <div class="secret-bg-glow"></div>
+
     <div class="secret-content">
 
-        <div class="secret-icon">⚡</div>
+        <div class="secret-icon">
+            ⚡
+        </div>
 
-        <div class="badge">
+        <div class="eyebrow">
             YOU FOUND THE SECRET
         </div>
 
         <h2>
-            HOW DID<br>
-            <span>THIS GAME</span><br>
+            HOW DID
+            <span>THIS GAME</span>
             WORK?
         </h2>
 
         <p>
-            Every movement, costume, sound and character
-            was made using <strong>Scratch blocks.</strong>
+            Every movement, character, costume,
+            sound and rule came from
+            <strong>Scratch blocks.</strong>
         </p>
 
-        <button id="revealButton" class="primary-button">
+        <button
+            id="secretContinue"
+            class="primary-button">
             🧩 SHOW ME HOW
         </button>
 
@@ -158,17 +242,26 @@
 
     <header class="tutorial-header">
 
-        <div>
+        <div class="tutorial-brand">
 
-            <div class="badge">
-                AURA PLUS • SCRATCH 3
+            <div class="brand-icon">
+                S
             </div>
 
-            <h1>BUILD THE GAME</h1>
+            <div>
+                <div class="eyebrow">
+                    AURA PLUS • SCRATCH 3
+                </div>
 
-            <p>
-                Learn Scratch by building AURA PLUS.
-            </p>
+                <h1>
+                    BUILD THE GAME
+                </h1>
+
+                <p>
+                    Learn the Scratch concepts
+                    behind AURA PLUS.
+                </p>
+            </div>
 
         </div>
 
@@ -194,12 +287,21 @@
 
         <div class="mission-intro">
 
-            <h2>🧩 SCRATCH MISSIONS</h2>
+            <div>
+                <div class="eyebrow">
+                    YOUR BUILD JOURNEY
+                </div>
 
-            <p>
-                Complete each mission and learn the real
-                Scratch concepts used to create the game.
-            </p>
+                <h2>
+                    🧩 SCRATCH MISSIONS
+                </h2>
+
+                <p>
+                    Build AURA PLUS step by step.
+                    Every mission teaches a real
+                    Scratch concept.
+                </p>
+            </div>
 
         </div>
 
@@ -208,14 +310,16 @@
 
             <!-- MISSION 1 -->
 
-            <button class="mission-card" data-mission="1">
+            <button
+                class="mission-card"
+                data-mission="1">
 
                 <div class="mission-number">
                     01
                 </div>
 
                 <div class="mission-icon">
-                    🐱
+                    👤
                 </div>
 
                 <div class="mission-info">
@@ -225,7 +329,7 @@
                     </h3>
 
                     <p>
-                        Add, select and delete sprites.
+                        Add, select and manage sprites.
                     </p>
 
                 </div>
@@ -239,7 +343,9 @@
 
             <!-- MISSION 2 -->
 
-            <button class="mission-card" data-mission="2">
+            <button
+                class="mission-card"
+                data-mission="2">
 
                 <div class="mission-number">
                     02
@@ -256,7 +362,7 @@
                     </h3>
 
                     <p>
-                        Learn Motion blocks.
+                        Use Motion blocks.
                     </p>
 
                 </div>
@@ -270,7 +376,9 @@
 
             <!-- MISSION 3 -->
 
-            <button class="mission-card" data-mission="3">
+            <button
+                class="mission-card"
+                data-mission="3">
 
                 <div class="mission-number">
                     03
@@ -287,7 +395,7 @@
                     </h3>
 
                     <p>
-                        Animate a sprite using costumes.
+                        Create simple animation.
                     </p>
 
                 </div>
@@ -301,7 +409,9 @@
 
             <!-- MISSION 4 -->
 
-            <button class="mission-card" data-mission="4">
+            <button
+                class="mission-card"
+                data-mission="4">
 
                 <div class="mission-number">
                     04
@@ -318,7 +428,8 @@
                     </h3>
 
                     <p>
-                        Give different sprites different scripts.
+                        Give different sprites
+                        different scripts.
                     </p>
 
                 </div>
@@ -332,14 +443,16 @@
 
             <!-- MISSION 5 -->
 
-            <button class="mission-card" data-mission="5">
+            <button
+                class="mission-card"
+                data-mission="5">
 
                 <div class="mission-number">
                     05
                 </div>
 
                 <div class="mission-icon">
-                    🌄
+                    🌌
                 </div>
 
                 <div class="mission-info">
@@ -349,7 +462,7 @@
                     </h3>
 
                     <p>
-                        Work with the Stage and backdrops.
+                        Build the game world.
                     </p>
 
                 </div>
@@ -363,7 +476,9 @@
 
             <!-- MISSION 6 -->
 
-            <button class="mission-card" data-mission="6">
+            <button
+                class="mission-card"
+                data-mission="6">
 
                 <div class="mission-number">
                     06
@@ -376,11 +491,11 @@
                 <div class="mission-info">
 
                     <h3>
-                        WORKING WITH SOUNDS
+                        ADD SOUND
                     </h3>
 
                     <p>
-                        Add sound to your Scratch project.
+                        Make the game feel alive.
                     </p>
 
                 </div>
@@ -394,14 +509,16 @@
 
             <!-- MISSION 7 -->
 
-            <button class="mission-card" data-mission="7">
+            <button
+                class="mission-card mission-final"
+                data-mission="7">
 
                 <div class="mission-number">
                     07
                 </div>
 
                 <div class="mission-icon">
-                    🚀
+                    ⚡
                 </div>
 
                 <div class="mission-info">
@@ -411,7 +528,8 @@
                     </h3>
 
                     <p>
-                        Build the same game you played at the start.
+                        Combine everything
+                        into the actual game.
                     </p>
 
                 </div>
@@ -430,40 +548,58 @@
 
 
 <!-- =========================================================
-     SCRATCH 3 LESSON / SIMULATOR
+     LESSON / SCRATCH EDITOR
 ========================================================= -->
 
 <section id="lessonScreen" class="screen hidden">
 
     <header class="lesson-topbar">
 
-        <button id="backToMissions" class="small-button">
-            ← MISSIONS
-        </button>
+        <div class="lesson-brand">
 
-        <div class="scratch-brand">
-
-            <span class="scratch-logo">
+            <div class="scratch-logo">
                 S
-            </span>
+            </div>
 
             <strong>
                 Scratch 3
             </strong>
 
-            <span class="project-title">
+            <span class="topbar-separator">
+                /
+            </span>
+
+            <span>
                 AURA PLUS
             </span>
 
         </div>
 
-        <div class="lesson-counter">
 
-            MISSION
-            <span id="lessonNumber">
-                1
-            </span>
-            / 7
+        <div class="lesson-project-name">
+            AURA PLUS
+        </div>
+
+
+        <div class="lesson-top-actions">
+
+            <button
+                id="lessonFlag"
+                class="stage-control green">
+                🟢
+            </button>
+
+            <button
+                id="lessonStop"
+                class="stage-control red">
+                🛑
+            </button>
+
+            <button
+                id="backToMissions"
+                class="back-button">
+                ← MISSIONS
+            </button>
 
         </div>
 
@@ -472,154 +608,165 @@
 
     <div class="lesson-layout">
 
-
-        <!-- =====================================================
-             LEFT INSTRUCTION PANEL
-        ====================================================== -->
+        <!-- =================================================
+             LEFT LESSON PANEL
+        ================================================= -->
 
         <aside class="lesson-panel">
 
-            <div class="lesson-badge">
-                STEP
-                <span id="lessonStep">
-                    1
-                </span>
-            </div>
+            <div class="lesson-panel-top">
 
-            <div class="step-progress">
-                <span id="stepProgressBar"></span>
-            </div>
-
-
-            <h1 id="lessonTitle">
-                Working with Sprites
-            </h1>
-
-
-            <p id="lessonDescription">
-                Sprites are the characters and objects in Scratch.
-            </p>
-
-
-            <div class="action-card">
-
-                <div class="action-label">
-                    DO THIS
+                <div class="lesson-badge">
+                    MISSION
+                    <span id="lessonNumber">
+                        1
+                    </span>
                 </div>
 
-                <div id="actionText">
-                    Click the AURA sprite in the Sprite List.
+                <div class="step-indicator">
+                    STEP
+                    <span id="lessonStep">
+                        1/4
+                    </span>
                 </div>
 
             </div>
 
 
-            <div class="learn-box">
+            <div class="lesson-progress">
+                <div
+                    id="stepProgressBar"
+                    class="lesson-progress-fill">
+                </div>
+            </div>
 
-                <div class="learn-title">
-                    🧠 WHY?
+
+            <div class="lesson-copy">
+
+                <div class="eyebrow">
+                    SCRATCH CHALLENGE
                 </div>
 
-                <p id="lessonWhy">
-                    Every sprite has its own scripts,
-                    costumes and sounds.
+                <h1 id="lessonTitle">
+                    Working with Sprites
+                </h1>
+
+                <p id="lessonDescription">
+                    Learn how sprites work in Scratch.
                 </p>
 
+
+                <div class="action-card">
+
+                    <div class="action-card-label">
+                        🎯 DO THIS
+                    </div>
+
+                    <p id="actionText">
+                        Click the highlighted control.
+                    </p>
+
+                </div>
+
+
+                <div class="why-card">
+
+                    <div class="why-label">
+                        🧠 WHY?
+                    </div>
+
+                    <p id="lessonWhy">
+                        Selecting a sprite tells
+                        Scratch which object you
+                        are programming.
+                    </p>
+
+                </div>
+
+
+                <div class="tip-card">
+
+                    <div class="tip-label">
+                        💡 REMEMBER
+                    </div>
+
+                    <p id="teacherTip">
+                        A project can contain
+                        many sprites.
+                    </p>
+
+                </div>
+
             </div>
 
 
-            <div class="teacher-tip">
+            <div class="lesson-bottom">
 
-                <strong>
-                    💡 REMEMBER
-                </strong>
+                <button
+                    id="nextLessonStep"
+                    class="next-button">
+                    NEXT
+                    <span>→</span>
+                </button>
 
-                <p id="teacherTip">
-                    One project can contain many sprites.
-                </p>
+                <div
+                    id="stepStatus"
+                    class="step-status">
+                    Follow the highlighted action.
+                </div>
 
-            </div>
-
-
-            <button id="nextLessonStep" class="primary-button">
-                NEXT →
-            </button>
-
-
-            <div id="stepStatus" class="step-status">
-                Follow the highlighted area, then press NEXT.
             </div>
 
         </aside>
 
 
-        <!-- =====================================================
+        <!-- =================================================
              SCRATCH EDITOR
-        ====================================================== -->
+        ================================================= -->
 
         <main class="scratch-editor">
 
+            <!-- EDITOR HEADER -->
 
-            <!-- SCRATCH TOP BAR -->
+            <div class="scratch-editor-header">
 
-            <div class="scratch-toolbar">
-
-                <div class="toolbar-left">
+                <div class="editor-tabs">
 
                     <button
-                        class="toolbar-icon"
-                        id="lessonFlag"
-                        title="Green Flag">
-
-                        🟢
-
+                        class="editor-tab active"
+                        data-tab="code">
+                        Code
                     </button>
 
                     <button
-                        class="toolbar-icon"
-                        id="lessonStop"
-                        title="Stop">
-
-                        🛑
-
+                        class="editor-tab"
+                        data-tab="costumes">
+                        Costumes
                     </button>
 
                     <button
-                        class="toolbar-icon"
+                        class="editor-tab"
+                        data-tab="sounds">
+                        Sounds
+                    </button>
+
+                </div>
+
+
+                <div class="editor-actions">
+
+                    <button
+                        id="undoButton"
+                        class="editor-action"
                         title="Undo">
-
                         ↶
-
                     </button>
 
                     <button
-                        class="toolbar-icon"
+                        id="redoButton"
+                        class="editor-action"
                         title="Redo">
-
                         ↷
-
-                    </button>
-
-                </div>
-
-
-                <div class="toolbar-project-name">
-                    AURA PLUS
-                </div>
-
-
-                <div class="toolbar-right">
-
-                    <button class="toolbar-mini">
-                        File
-                    </button>
-
-                    <button class="toolbar-mini">
-                        Edit
-                    </button>
-
-                    <button class="toolbar-mini">
-                        Tutorials
                     </button>
 
                 </div>
@@ -627,50 +774,14 @@
             </div>
 
 
-            <!-- CODE / COSTUMES / SOUNDS -->
+            <!-- EDITOR BODY -->
 
-            <div class="scratch-project-tabs">
-
-                <button
-                    class="project-tab active"
-                    data-editor-tab="code">
-
-                    Code
-
-                </button>
-
-                <button
-                    class="project-tab"
-                    data-editor-tab="costumes">
-
-                    Costumes
-
-                </button>
-
-                <button
-                    class="project-tab"
-                    data-editor-tab="sounds">
-
-                    Sounds
-
-                </button>
+            <div class="scratch-editor-body">
 
 
-                <span class="project-tab-note">
-                    Click the highlighted Scratch control
-                </span>
-
-            </div>
-
-
-            <!-- MAIN SCRATCH EDITOR -->
-
-            <div class="scratch-main">
-
-
-                <!-- =================================================
-                     BLOCK CATEGORIES
-                ================================================== -->
+                <!-- =========================================
+                     LEFT CATEGORY BAR
+                ========================================== -->
 
                 <aside class="block-categories">
 
@@ -683,7 +794,9 @@
                         class="block-category active"
                         data-category="motion">
 
-                        <span class="cat-dot motion-dot"></span>
+                        <span class="category-dot motion-dot">
+                        </span>
+
                         Motion
 
                     </button>
@@ -693,7 +806,9 @@
                         class="block-category"
                         data-category="looks">
 
-                        <span class="cat-dot looks-dot"></span>
+                        <span class="category-dot looks-dot">
+                        </span>
+
                         Looks
 
                     </button>
@@ -703,7 +818,9 @@
                         class="block-category"
                         data-category="sound">
 
-                        <span class="cat-dot sound-dot"></span>
+                        <span class="category-dot sound-dot">
+                        </span>
+
                         Sound
 
                     </button>
@@ -713,7 +830,9 @@
                         class="block-category"
                         data-category="events">
 
-                        <span class="cat-dot events-dot"></span>
+                        <span class="category-dot events-dot">
+                        </span>
+
                         Events
 
                     </button>
@@ -723,7 +842,9 @@
                         class="block-category"
                         data-category="control">
 
-                        <span class="cat-dot control-dot"></span>
+                        <span class="category-dot control-dot">
+                        </span>
+
                         Control
 
                     </button>
@@ -733,7 +854,9 @@
                         class="block-category"
                         data-category="sensing">
 
-                        <span class="cat-dot sensing-dot"></span>
+                        <span class="category-dot sensing-dot">
+                        </span>
+
                         Sensing
 
                     </button>
@@ -743,7 +866,9 @@
                         class="block-category"
                         data-category="operators">
 
-                        <span class="cat-dot operators-dot"></span>
+                        <span class="category-dot operators-dot">
+                        </span>
+
                         Operators
 
                     </button>
@@ -753,7 +878,9 @@
                         class="block-category"
                         data-category="variables">
 
-                        <span class="cat-dot variables-dot"></span>
+                        <span class="category-dot variables-dot">
+                        </span>
+
                         Variables
 
                     </button>
@@ -763,7 +890,9 @@
                         class="block-category"
                         data-category="myblocks">
 
-                        <span class="cat-dot myblocks-dot"></span>
+                        <span class="category-dot myblocks-dot">
+                        </span>
+
                         My Blocks
 
                     </button>
@@ -771,59 +900,70 @@
                 </aside>
 
 
-                <!-- =================================================
+                <!-- =========================================
                      BLOCK PALETTE
-                ================================================== -->
+                ========================================== -->
 
                 <section class="block-palette">
 
                     <div class="palette-header">
 
-                        <span id="paletteCategory">
-                            Motion
-                        </span>
+                        <div>
 
-                        <span class="help-icon">
-                            ?
-                        </span>
+                            <strong id="paletteCategory">
+                                Motion
+                            </strong>
 
-                    </div>
+                            <small>
+                                Click a block to add it
+                            </small>
 
-
-                    <div id="blockPalette">
-                        <!-- JavaScript fills blocks -->
-                    </div>
-
-
-                    <div class="palette-assets">
+                        </div>
 
                         <button
-                            class="asset-action"
-                            id="chooseBlockAsset">
-
-                            ＋ Add Block
-
+                            id="paletteHelp"
+                            class="help-button">
+                            ?
                         </button>
+
+                    </div>
+
+
+                    <div
+                        id="blockPalette"
+                        class="palette-scroll">
+
+                        <!-- JS FILLS THIS -->
 
                     </div>
 
                 </section>
 
 
-                <!-- =================================================
+                <!-- =========================================
                      SCRIPT WORKSPACE
-                ================================================== -->
+                ========================================== -->
 
                 <section class="script-workspace">
 
                     <div class="workspace-header">
 
-                        <span>
-                            Code
-                        </span>
+                        <div>
 
-                        <span id="selectedTarget">
-                            AURA
+                            <strong>
+                                CODE
+                            </strong>
+
+                            <span id="workspaceHint">
+                                Build your script here
+                            </span>
+
+                        </div>
+
+                        <span
+                            id="workspaceInstruction"
+                            class="workspace-guide">
+                            Follow the highlighted action.
                         </span>
 
                     </div>
@@ -833,29 +973,39 @@
                         id="lessonBlocks"
                         class="lesson-blocks">
 
-                        <div class="workspace-empty">
+                        <div
+                            class="empty-workspace"
+                            id="emptyWorkspace">
 
-                            Drag a block here
+                            <div class="empty-icon">
+                                🧩
+                            </div>
 
-                            <br>
+                            <strong>
+                                Your script starts here
+                            </strong>
 
-                            <small>
-                                or tap a block to add it
-                            </small>
+                            <p>
+                                Click the highlighted
+                                Scratch block.
+                            </p>
 
                         </div>
 
                     </div>
 
 
-                    <div class="workspace-message">
+                    <div class="workspace-footer">
 
                         <span>
-                            👉
+                            🧩
+                            <strong id="blockCount">
+                                0 blocks
+                            </strong>
                         </span>
 
-                        <span id="workspaceInstruction">
-                            Your next action will be highlighted.
+                        <span>
+                            Scratch-style workspace
                         </span>
 
                     </div>
@@ -863,76 +1013,61 @@
                 </section>
 
 
-                <!-- =================================================
+                <!-- =========================================
                      RIGHT PANEL
-                ================================================== -->
+                ========================================== -->
 
                 <aside class="scratch-right-panel">
 
 
                     <!-- STAGE -->
 
-                    <div class="stage-toolbar">
+                    <div class="stage-section">
 
-                        <span>
-                            STAGE
-                        </span>
+                        <div class="stage-header">
 
-                        <span class="stage-size">
-                            Small
-                        </span>
+                            <strong>
+                                STAGE
+                            </strong>
 
-                    </div>
-
-
-                    <div
-                        id="previewStage"
-                        class="scratch-stage">
-
-                        <div class="stage-controls">
-
-                            <button
-                                id="stageFlag"
-                                title="Start">
-
-                                🟢
-
-                            </button>
-
-                            <button
-                                id="stageStop"
-                                title="Stop">
-
-                                🛑
-
-                            </button>
+                            <span>
+                                480 × 360
+                            </span>
 
                         </div>
 
 
-                        <div class="stage-scene">
+                        <div
+                            id="previewStage"
+                            class="scratch-stage">
 
-                            <div class="stage-star s1"></div>
-                            <div class="stage-star s2"></div>
-                            <div class="stage-star s3"></div>
-
-                            <div class="stage-orb o1"></div>
-                            <div class="stage-orb o2"></div>
-
-                            <div class="stage-portal">
-                                ✦
+                            <div
+                                class="stage-background">
                             </div>
+
+
+                            <div
+                                class="stage-controls">
+
+                                <button
+                                    id="stageGreenFlag"
+                                    title="Start">
+                                    🟢
+                                </button>
+
+                                <button
+                                    id="stageStop"
+                                    title="Stop">
+                                    🛑
+                                </button>
+
+                            </div>
+
 
                             <div
                                 id="previewPlayer"
                                 class="preview-sprite">
-
                                 A
-
-                            </div>
-
-                            <div class="stage-shadow">
-                                ◆
                             </div>
 
                         </div>
@@ -940,24 +1075,20 @@
                     </div>
 
 
-                    <!-- =================================================
-                         SPRITE LIST
-                    ================================================== -->
+                    <!-- SPRITE LIST -->
 
-                    <div class="asset-section">
+                    <div class="sprite-section">
 
-                        <div class="asset-section-head">
+                        <div class="panel-section-header">
 
                             <strong>
                                 SPRITE LIST
                             </strong>
 
                             <button
-                                id="addSpriteButton"
+                                id="chooseSpriteButton"
                                 class="plus-button">
-
-                                ＋
-
+                                +
                             </button>
 
                         </div>
@@ -970,251 +1101,252 @@
 
                             <button
                                 class="sprite-card selected"
-                                data-sprite="Aura">
+                                data-sprite="aura">
 
-                                <span class="sprite-thumb aura-thumb">
+                                <div class="sprite-thumb aura-thumb">
                                     A
-                                </span>
+                                </div>
 
-                                <span>
+                                <div class="sprite-meta">
 
-                                    <b>
+                                    <strong>
                                         Aura
-                                    </b>
+                                    </strong>
 
                                     <small>
                                         Sprite
                                     </small>
 
-                                </span>
+                                </div>
 
                             </button>
 
 
                             <button
                                 class="sprite-card"
-                                data-sprite="Shadow">
+                                data-sprite="shadow">
 
-                                <span class="sprite-thumb shadow-thumb">
-                                    ◆
-                                </span>
+                                <div class="sprite-thumb shadow-thumb">
+                                    👾
+                                </div>
 
-                                <span>
+                                <div class="sprite-meta">
 
-                                    <b>
+                                    <strong>
                                         Shadow
-                                    </b>
+                                    </strong>
 
                                     <small>
                                         Sprite
                                     </small>
 
-                                </span>
+                                </div>
 
                             </button>
 
 
                             <button
                                 class="sprite-card"
-                                data-sprite="Orb">
+                                data-sprite="orb">
 
-                                <span class="sprite-thumb orb-thumb">
+                                <div class="sprite-thumb orb-thumb">
                                     ●
-                                </span>
+                                </div>
 
-                                <span>
+                                <div class="sprite-meta">
 
-                                    <b>
+                                    <strong>
                                         Orb
-                                    </b>
+                                    </strong>
 
                                     <small>
                                         Sprite
                                     </small>
 
-                                </span>
+                                </div>
 
                             </button>
 
 
                             <button
                                 class="sprite-card"
-                                data-sprite="Portal">
+                                data-sprite="portal">
 
-                                <span class="sprite-thumb portal-thumb">
+                                <div class="sprite-thumb portal-thumb">
                                     ✦
-                                </span>
+                                </div>
 
-                                <span>
+                                <div class="sprite-meta">
 
-                                    <b>
+                                    <strong>
                                         Portal
-                                    </b>
+                                    </strong>
 
                                     <small>
                                         Sprite
                                     </small>
 
-                                </span>
+                                </div>
 
                             </button>
+
 
                         </div>
-
-
-                        <button
-                            id="chooseSpriteButton"
-                            class="choose-asset">
-
-                            ＋ Choose a Sprite
-
-                        </button>
 
                     </div>
 
 
-                    <!-- =================================================
-                         COSTUMES / SOUNDS
-                    ================================================== -->
+                    <!-- SPRITE DETAILS -->
 
-                    <div
-                        id="assetLibrary"
-                        class="asset-library">
+                    <div class="asset-section">
 
-                        <div class="asset-library-head">
+                        <div class="asset-tabs">
 
-                            <strong id="assetLibraryTitle">
+                            <button
+                                class="asset-tab active"
+                                data-asset="costumes">
                                 COSTUMES
-                            </strong>
+                            </button>
 
-                            <button id="assetLibraryAdd">
-                                ＋
+                            <button
+                                class="asset-tab"
+                                data-asset="sounds">
+                                SOUNDS
                             </button>
 
                         </div>
 
 
                         <div
-                            id="assetLibraryItems"
-                            class="asset-library-items">
-                        </div>
+                            id="assetLibrary"
+                            class="asset-library">
 
-
-                        <div class="asset-library-actions">
-
-                            <button id="chooseAssetButton">
-                                ＋ Choose
-                            </button>
-
-                            <button id="uploadAssetButton">
-                                ⬆ Upload
-                            </button>
-
-                            <button id="paintAssetButton">
-                                🎨 Paint
-                            </button>
+                            <!-- JS FILLS -->
 
                         </div>
 
                     </div>
 
 
-                    <!-- =================================================
-                         BACKDROPS
-                    ================================================== -->
+                    <!-- BACKDROPS -->
 
-                    <div
-                        id="backdropLibrary"
-                        class="backdrop-library">
+                    <div class="backdrop-section">
 
-                        <div class="asset-library-head">
+                        <div class="panel-section-header">
 
                             <strong>
                                 BACKDROPS
                             </strong>
 
-                            <button id="addBackdropButton">
-                                ＋
+                            <button
+                                id="chooseBackdropButton"
+                                class="plus-button">
+                                +
                             </button>
 
                         </div>
 
 
                         <div
-                            id="backdropItems"
-                            class="asset-library-items">
-                        </div>
+                            id="backdropLibrary"
+                            class="backdrop-library">
 
+                            <button
+                                class="backdrop-card selected"
+                                data-backdrop="space">
 
-                        <div class="asset-library-actions">
+                                <div class="backdrop-thumb space-backdrop">
+                                </div>
 
-                            <button id="chooseBackdropButton">
-                                ＋ Choose Backdrop
+                                <small>
+                                    Space
+                                </small>
+
                             </button>
 
-                            <button id="uploadBackdropButton">
-                                ⬆ Upload
+
+                            <button
+                                class="backdrop-card"
+                                data-backdrop="neon">
+
+                                <div class="backdrop-thumb neon-backdrop">
+                                </div>
+
+                                <small>
+                                    Neon
+                                </small>
+
                             </button>
 
-                            <button id="paintBackdropButton">
-                                🎨 Paint
+
+                            <button
+                                class="backdrop-card"
+                                data-backdrop="city">
+
+                                <div class="backdrop-thumb city-backdrop">
+                                </div>
+
+                                <small>
+                                    City
+                                </small>
+
                             </button>
 
                         </div>
 
                     </div>
-
-
-                    <button
-                        id="stageSelectButton"
-                        class="stage-select-button">
-
-                        ▣ Select Stage
-
-                    </button>
 
                 </aside>
 
             </div>
 
 
-            <!-- =====================================================
-                 BOTTOM BAR
-            ====================================================== -->
+            <!-- EDITOR FOOTER -->
 
-            <div class="scratch-bottom">
+            <footer class="scratch-footer">
 
-                <div class="bottom-info">
+                <div class="footer-left">
 
                     <span>
-                        🧩 Scratch 3 Blocks
+                        🧩
+                        Scratch Blocks
                     </span>
 
-                    <span id="blockCount">
-                        0 blocks
-                    </span>
+                    <strong id="bottomBlockCount">
+                        0
+                    </strong>
 
                 </div>
 
 
                 <div
-                    class="bottom-hint"
-                    id="bottomHint">
+                    id="bottomHint"
+                    class="footer-hint">
 
-                    Do the highlighted action.
+                    Click the highlighted block
+                    to add it to your script.
 
                 </div>
 
-            </div>
+
+                <button
+                    id="runLessonButton"
+                    class="run-button">
+
+                    🟢 RUN
+
+                </button>
+
+            </footer>
 
         </main>
 
     </div>
 
 
-    <!-- =========================================================
+    <!-- =====================================================
          QUICK CHECK
-    ========================================================= -->
+    ====================================================== -->
 
     <div
         id="quickCheck"
@@ -1226,11 +1358,9 @@
                 QUICK CHECK
             </div>
 
-
             <h2 id="checkQuestion">
-                Which Scratch category contains this block?
+                Which category contains this block?
             </h2>
-
 
             <div
                 id="checkBlock"
@@ -1269,56 +1399,51 @@
 
 
 <!-- =========================================================
-     FINAL
+     FINAL SCREEN
 ========================================================= -->
 
-<section id="finalScreen" class="screen hidden">
+<section
+    id="finalScreen"
+    class="screen hidden">
+
+    <div class="final-bg-glow"></div>
 
     <div class="final-content">
 
-        <div class="final-icon">
-            🏆
-        </div>
-
-        <div class="badge">
-            SCRATCH GAME LAB COMPLETE
+        <div class="final-badge">
+            🏆 MISSION COMPLETE
         </div>
 
         <h1>
-            YOU'RE A<br>
-            <span>SCRATCH BUILDER.</span>
+            YOU BUILT
+            <span>AURA PLUS.</span>
         </h1>
 
         <p>
-            You learned the Scratch concepts used to
-            build AURA PLUS.
+            You didn't just play a Scratch game.
+            You learned how to build one.
         </p>
 
-
-        <div class="final-skills">
+        <div class="final-stats">
 
             <div>
-                🧩 SPRITES
+                <strong>
+                    07
+                </strong>
+
+                <span>
+                    MISSIONS
+                </span>
             </div>
 
             <div>
-                🟦 MOTION
-            </div>
+                <strong>
+                    ∞
+                </strong>
 
-            <div>
-                🎭 COSTUMES
-            </div>
-
-            <div>
-                🌄 BACKDROPS
-            </div>
-
-            <div>
-                🔊 SOUNDS
-            </div>
-
-            <div>
-                ⚡ SCRIPTS
+                <span>
+                    IDEAS
+                </span>
             </div>
 
         </div>
@@ -1336,6 +1461,10 @@
 
 </section>
 
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================= -->
 
 <script src="script.js"></script>
 
