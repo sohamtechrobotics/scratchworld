@@ -1,34 +1,22 @@
 /* =========================================================
-   AURA PLUS — FINAL SCRIPT
-   Works with the supplied index.html + style.css
+   AURA PLUS — SCRATCH GAME LAB
+   FINAL SCRIPT
+   PART 1 / 3
    ========================================================= */
 
 "use strict";
 
 /* =========================================================
-   HELPERS
+   BASIC HELPERS
    ========================================================= */
 
 const $ = id => document.getElementById(id);
-const $$ = selector => [...document.querySelectorAll(selector)];
 
-function showScreen(id) {
-    $$(".screen").forEach(s => {
-        s.classList.add("hidden");
-        s.classList.remove("active");
-    });
+const $$ = selector =>
+    [...document.querySelectorAll(selector)];
 
-    const screen = $(id);
-
-    if (screen) {
-        screen.classList.remove("hidden");
-        screen.classList.add("active");
-    }
-}
-
-function clamp(n, min, max) {
-    return Math.max(min, Math.min(max, n));
-}
+const qs = selector =>
+    document.querySelector(selector);
 
 
 /* =========================================================
@@ -38,336 +26,366 @@ function clamp(n, min, max) {
 let currentMission = 1;
 let currentStep = 0;
 
-let selectedSprite = "aura";
+let selectedSprite = null;
 let selectedCategory = "motion";
-let selectedAsset = "costumes";
+let selectedAsset = null;
+let selectedAssetType = "costumes";
+let selectedBackdrop = "space";
 
-let completedMissions =
-    JSON.parse(localStorage.getItem("auraPlusMissions") || "[]");
+let currentEditorTab = "code";
+
+/*
+   IMPORTANT:
+   Every sprite has its OWN workspace.
+   This fixes the original problem where
+   AURA's code appeared when SHADOW was selected.
+*/
+
+const spriteWorkspaces = {
+    aura: [],
+    shadow: [],
+    orb: [],
+    portal: [],
+    star: [],
+    stage: []
+};
 
 let workspaceBlocks = [];
 
 let undoStack = [];
 let redoStack = [];
 
+let lastRunCompleted = false;
+let lessonRunning = false;
+let lessonTimer = null;
+
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+
 let gameRunning = false;
 let gameAnimation = null;
+let lastHit = 0;
 
 let auraGame = {
-    x: 10,
+    x: 12,
     y: 50,
     score: 0,
     lives: 3,
     collected: 0,
-    running: false,
     shadowX: 72,
     shadowY: 50
 };
 
 
 /* =========================================================
-   BLOCK DEFINITIONS
+   COMPLETED MISSIONS
    ========================================================= */
 
-const blocks = {
+let completedMissions =
+    JSON.parse(
+        localStorage.getItem("auraPlusMissions") || "[]"
+    );
+
+
+/* =========================================================
+   SCRATCH BLOCK DEFINITIONS
+   ========================================================= */
+
+const scratchBlocks = {
 
     motion: [
         {
-            text: "move 10 steps",
-            className: "block-motion",
             id: "move",
-            inputs: [
-                { type: "number", value: "10" }
-            ]
+            text: "move 10 steps",
+            color: "motion"
         },
         {
-            text: "turn 15 degrees",
-            className: "block-motion",
-            id: "turn",
-            inputs: [
-                { type: "number", value: "15" }
-            ]
-        },
-        {
-            text: "go to random position",
-            className: "block-motion",
-            id: "random"
-        },
-        {
-            text: "change x by 10",
-            className: "block-motion",
             id: "changex",
-            inputs: [
-                { type: "number", value: "10" }
-            ]
+            text: "change x by 10",
+            color: "motion"
         },
         {
-            text: "change y by 10",
-            className: "block-motion",
             id: "changey",
-            inputs: [
-                { type: "number", value: "10" }
-            ]
+            text: "change y by 10",
+            color: "motion"
         },
         {
-            text: "set x to 0",
-            className: "block-motion",
+            id: "turn",
+            text: "turn 15 degrees",
+            color: "motion"
+        },
+        {
+            id: "random",
+            text: "go to random position",
+            color: "motion"
+        },
+        {
             id: "setx",
-            inputs: [
-                { type: "number", value: "0" }
-            ]
+            text: "set x to 0",
+            color: "motion"
         },
         {
-            text: "set y to 0",
-            className: "block-motion",
             id: "sety",
-            inputs: [
-                { type: "number", value: "0" }
-            ]
+            text: "set y to 0",
+            color: "motion"
         },
         {
+            id: "bounce",
             text: "if on edge, bounce",
-            className: "block-motion",
-            id: "bounce"
-        },
-        {
-            text: "point in direction 90",
-            className: "block-motion",
-            id: "direction",
-            inputs: [
-                { type: "number", value: "90" }
-            ]
+            color: "motion"
         }
     ],
 
     looks: [
         {
-            text: "say Hello! for 2 seconds",
-            className: "block-looks",
             id: "say",
-            inputs: [
-                { type: "text", value: "Hello!" },
-                { type: "number", value: "2" }
-            ]
+            text: "say Hello! for 2 seconds",
+            color: "looks"
         },
         {
-            text: "say Hello!",
-            className: "block-looks",
-            id: "sayforever",
-            inputs: [
-                { type: "text", value: "Hello!" }
-            ]
-        },
-        {
-            text: "switch costume to costume1",
-            className: "block-looks",
-            id: "costume"
-        },
-        {
+            id: "nextcostume",
             text: "next costume",
-            className: "block-looks",
-            id: "nextcostume"
+            color: "looks"
         },
         {
-            text: "change size by 10",
-            className: "block-looks",
+            id: "costume",
+            text: "switch costume to costume1",
+            color: "looks"
+        },
+        {
             id: "size",
-            inputs: [
-                { type: "number", value: "10" }
-            ]
+            text: "change size by 10",
+            color: "looks"
         }
     ],
 
     sound: [
         {
+            id: "soundstart",
             text: "start sound Meow",
-            className: "block-sound",
-            id: "soundstart"
+            color: "sound"
         },
         {
+            id: "soundwait",
             text: "play sound Meow until done",
-            className: "block-sound",
-            id: "soundwait"
-        },
-        {
-            text: "change volume by -10",
-            className: "block-sound",
-            id: "volume",
-            inputs: [
-                { type: "number", value: "-10" }
-            ]
+            color: "sound"
         }
     ],
 
     events: [
         {
+            id: "flag",
             text: "when green flag clicked",
-            className: "block-events",
-            id: "flag"
+            color: "events"
         },
         {
+            id: "spriteclick",
             text: "when this sprite clicked",
-            className: "block-events",
-            id: "spriteclick"
+            color: "events"
         },
         {
+            id: "space",
             text: "when space key pressed",
-            className: "block-events",
-            id: "space"
+            color: "events"
         },
         {
-            text: "when I receive message1",
-            className: "block-events",
-            id: "receive"
-        },
-        {
+            id: "broadcast",
             text: "broadcast message1",
-            className: "block-events",
-            id: "broadcast"
-        },
-        {
-            text: "broadcast message1 and wait",
-            className: "block-events",
-            id: "broadcastwait"
+            color: "events"
         }
     ],
 
     control: [
         {
-            text: "wait 1 seconds",
-            className: "block-control",
             id: "wait",
-            inputs: [
-                { type: "number", value: "1" }
-            ]
+            text: "wait 1 seconds",
+            color: "control"
         },
         {
-            text: "repeat 10",
-            className: "block-control",
             id: "repeat",
-            inputs: [
-                { type: "number", value: "10" }
-            ]
+            text: "repeat 10",
+            color: "control"
         },
         {
+            id: "forever",
             text: "forever",
-            className: "block-control",
-            id: "forever"
+            color: "control"
         },
         {
+            id: "if",
             text: "if then",
-            className: "block-control",
-            id: "if"
+            color: "control"
         },
         {
+            id: "ifelse",
             text: "if then else",
-            className: "block-control",
-            id: "ifelse"
+            color: "control"
         },
         {
+            id: "stop",
             text: "stop all",
-            className: "block-control",
-            id: "stop"
+            color: "control"
         }
     ],
 
     sensing: [
         {
+            id: "touching",
             text: "touching mouse-pointer?",
-            className: "block-sensing",
-            id: "touching"
+            color: "sensing"
         },
         {
-            text: "ask What's your name? and wait",
-            className: "block-sensing",
-            id: "ask"
+            id: "touchingorb",
+            text: "touching Orb?",
+            color: "sensing"
         },
         {
+            id: "key",
             text: "key space pressed?",
-            className: "block-sensing",
-            id: "key"
+            color: "sensing"
         },
         {
+            id: "mouse",
             text: "mouse down?",
-            className: "block-sensing",
-            id: "mouse"
-        },
-        {
-            text: "timer",
-            className: "block-sensing",
-            id: "timer"
+            color: "sensing"
         }
     ],
 
     operators: [
         {
+            id: "add",
             text: "1 + 1",
-            className: "block-operators",
-            id: "add"
+            color: "operators"
         },
         {
+            id: "greater",
             text: "1 > 1",
-            className: "block-operators",
-            id: "greater"
+            color: "operators"
         },
         {
+            id: "equals",
             text: "1 = 1",
-            className: "block-operators",
-            id: "equals"
+            color: "operators"
         },
         {
+            id: "randomnumber",
             text: "pick random 1 to 10",
-            className: "block-operators",
-            id: "randomnumber"
-        },
-        {
-            text: "join hello world",
-            className: "block-operators",
-            id: "join"
+            color: "operators"
         }
     ],
 
     variables: [
         {
-            text: "set my variable to 0",
-            className: "block-variables",
             id: "setvar",
-            inputs: [
-                { type: "number", value: "0" }
-            ]
+            text: "set Score to 0",
+            color: "variables"
         },
         {
-            text: "change my variable by 1",
-            className: "block-variables",
             id: "changevar",
-            inputs: [
-                { type: "number", value: "1" }
-            ]
+            text: "change Score by 10",
+            color: "variables"
         },
         {
-            text: "show variable my variable",
-            className: "block-variables",
-            id: "showvar"
-        },
-        {
-            text: "hide variable my variable",
-            className: "block-variables",
-            id: "hidevar"
+            id: "showvar",
+            text: "show variable Score",
+            color: "variables"
         }
     ],
 
     myblocks: [
         {
+            id: "define",
             text: "define my block",
-            className: "block-myblocks",
-            id: "define"
+            color: "myblocks"
         },
         {
+            id: "custom",
             text: "my block",
-            className: "block-myblocks",
-            id: "custom"
+            color: "myblocks"
         }
     ]
+};
+
+
+/* =========================================================
+   SPRITE ASSETS
+   ========================================================= */
+
+const spriteAssets = {
+
+    aura: {
+        costumes: [
+            "AURA",
+            "AURA GLOW",
+            "AURA RUN"
+        ],
+        sounds: [
+            "Meow",
+            "Pop",
+            "Collect"
+        ]
+    },
+
+    shadow: {
+        costumes: [
+            "Shadow",
+            "Shadow Attack"
+        ],
+        sounds: [
+            "Boom",
+            "Buzz"
+        ]
+    },
+
+    orb: {
+        costumes: [
+            "Orb",
+            "Orb Glow"
+        ],
+        sounds: [
+            "Pop",
+            "Collect"
+        ]
+    },
+
+    portal: {
+        costumes: [
+            "Portal",
+            "Portal Open"
+        ],
+        sounds: [
+            "Magic",
+            "Win"
+        ]
+    },
+
+    star: {
+        costumes: [
+            "Star"
+        ],
+        sounds: [
+            "Pop"
+        ]
+    }
+};
+
+
+/* =========================================================
+   BACKDROPS
+   ========================================================= */
+
+const backdropData = {
+
+    space:
+        "radial-gradient(circle at 50% 40%, #172554, #07101e 75%)",
+
+    neon:
+        "linear-gradient(135deg,#7c3aed,#0891b2)",
+
+    city:
+        "linear-gradient(180deg,#38bdf8 0 50%,#334155 50%)"
 };
 
 
@@ -378,468 +396,459 @@ const blocks = {
 const lessons = {
 
     1: {
+
         title: "Working with Sprites",
+
         description:
             "Sprites are the characters and objects in Scratch.",
-        why:
-            "Selecting a sprite tells Scratch which object you are programming.",
-        tip:
-            "A project can contain many sprites.",
+
         steps: [
 
             {
                 title: "Select AURA",
+
                 action:
                     "Click the AURA sprite in the Sprite List.",
-                why:
-                    "You must select a sprite before writing its script.",
-                tip:
-                    "Each sprite can have its own code.",
-                target: "sprite-aura"
+
+                target:
+                    "sprite-aura"
             },
 
             {
                 title: "Add another sprite",
+
                 action:
-                    "Click the + button beside SPRITE LIST.",
-                why:
-                    "The + button lets you add another character or object.",
-                tip:
-                    "Games often use many sprites.",
-                target: "choose-sprite"
+                    "Click + Choose a Sprite.",
+
+                target:
+                    "choose-sprite"
             },
 
             {
                 title: "Select SHADOW",
+
                 action:
-                    "Click the SHADOW sprite.",
-                why:
-                    "Different sprites can have completely different scripts.",
-                tip:
-                    "AURA and SHADOW can behave differently.",
-                target: "sprite-shadow"
+                    "Click SHADOW in the Sprite List.",
+
+                target:
+                    "sprite-shadow"
             },
 
             {
                 title: "Return to AURA",
+
                 action:
                     "Click AURA again.",
-                why:
-                    "Now we are ready to program the player.",
-                tip:
-                    "Always check which sprite is selected.",
-                target: "sprite-aura"
+
+                target:
+                    "sprite-aura"
             }
         ]
     },
 
 
     2: {
+
         title: "Make AURA Move",
+
         description:
-            "Use Motion blocks to control position and movement.",
-        why:
-            "Motion blocks tell a sprite where and how to move.",
-        tip:
-            "X controls left/right. Y controls up/down.",
+            "Use Motion blocks to control position.",
+
         steps: [
 
             {
                 title: "Start the script",
+
                 action:
                     "Open Events and click 'when green flag clicked'.",
-                why:
-                    "The green flag starts the game.",
-                tip:
-                    "Event blocks tell Scratch when a script starts.",
-                category: "events",
-                block: "flag"
+
+                category:
+                    "events",
+
+                block:
+                    "flag"
             },
 
             {
                 title: "Move AURA",
+
                 action:
                     "Open Motion and click 'move 10 steps'.",
-                why:
-                    "This makes AURA move forward.",
-                tip:
-                    "You can change 10 to another number.",
-                category: "motion",
-                block: "move"
+
+                category:
+                    "motion",
+
+                block:
+                    "move"
             },
 
             {
                 title: "Change X",
+
                 action:
                     "Click 'change x by 10'.",
-                why:
-                    "Changing X moves the sprite left or right.",
-                tip:
-                    "Try changing 10 to 50.",
-                category: "motion",
-                block: "changex"
+
+                category:
+                    "motion",
+
+                block:
+                    "changex"
             },
 
             {
                 title: "Test it",
+
                 action:
-                    "Click the green RUN button.",
-                why:
-                    "Running the script lets you see your code in action.",
-                tip:
-                    "Build → run → observe → modify.",
-                run: true
+                    "Click the green flag to run your script.",
+
+                run:
+                    true
             }
         ]
     },
 
 
     3: {
+
         title: "Change Costumes",
+
         description:
             "Costumes change how a sprite looks.",
-        why:
-            "Changing costumes can create animation.",
-        tip:
-            "One sprite can have many costumes.",
+
         steps: [
 
             {
                 title: "Open Costumes",
+
                 action:
-                    "Click the Costumes tab at the top.",
-                why:
-                    "The Costumes tab lets you manage how the sprite looks.",
-                tip:
-                    "Costumes belong to the selected sprite.",
-                tab: "costumes"
+                    "Click the Costumes tab.",
+
+                tab:
+                    "costumes"
             },
 
             {
-                title: "Choose a costume",
+                title: "Choose AURA GLOW",
+
                 action:
-                    "Click a costume in the costume library.",
-                why:
-                    "Selecting a costume changes the sprite's appearance.",
-                tip:
-                    "Try different costumes.",
-                asset: "costume"
+                    "Click AURA GLOW in the costume library.",
+
+                asset:
+                    "costume",
+
+                assetName:
+                    "AURA GLOW"
             },
 
             {
-                title: "Add a costume block",
+                title: "Add next costume",
+
                 action:
                     "Return to Code → Looks and click 'next costume'.",
-                why:
-                    "The next costume block can create animation.",
-                tip:
-                    "Put it inside a repeat or forever loop for animation.",
-                category: "looks",
-                block: "nextcostume"
+
+                category:
+                    "looks",
+
+                block:
+                    "nextcostume"
             },
 
             {
-                title: "Run the costume change",
+                title: "Test it",
+
                 action:
-                    "Click 🟢 RUN.",
-                why:
-                    "You can now test the costume change.",
-                tip:
-                    "Animation is just a sequence of costume changes.",
-                run: true
+                    "Click the green flag.",
+
+                run:
+                    true
             }
         ]
     },
 
 
     4: {
+
         title: "Program Two Sprites",
+
         description:
-            "Different sprites can have different scripts.",
-        why:
-            "This lets a game give each character its own behaviour.",
-        tip:
-            "Select the sprite before adding its blocks.",
+            "Each sprite can have its own script.",
+
         steps: [
 
             {
                 title: "Select AURA",
+
                 action:
-                    "Click AURA in the Sprite List.",
-                why:
-                    "We will create AURA's movement script.",
-                tip:
-                    "The blue outline shows the selected sprite.",
-                target: "sprite-aura"
+                    "Click AURA.",
+
+                target:
+                    "sprite-aura"
             },
 
             {
-                title: "Add AURA's event",
+                title: "Give AURA an event",
+
                 action:
-                    "Open Events → click 'when green flag clicked'.",
-                why:
-                    "AURA's script starts when the game starts.",
-                tip:
-                    "Event blocks are usually at the top of a script.",
-                category: "events",
-                block: "flag"
+                    "Open Events and click 'when green flag clicked'.",
+
+                category:
+                    "events",
+
+                block:
+                    "flag"
             },
 
             {
                 title: "Select SHADOW",
+
                 action:
-                    "Click SHADOW in the Sprite List.",
-                why:
-                    "Now we can give SHADOW different code.",
-                tip:
-                    "The selected sprite owns the script.",
-                target: "sprite-shadow"
+                    "Click SHADOW.",
+
+                target:
+                    "sprite-shadow"
             },
 
             {
-                title: "Give SHADOW behaviour",
+                title: "Give SHADOW movement",
+
                 action:
-                    "Open Motion → click 'move 10 steps'.",
-                why:
-                    "SHADOW now has its own movement behaviour.",
-                tip:
-                    "Two sprites can use different blocks.",
-                category: "motion",
-                block: "move"
+                    "Open Motion and click 'move 10 steps'.",
+
+                category:
+                    "motion",
+
+                block:
+                    "move"
             }
         ]
     },
 
 
     5: {
-        title: "Change the Backdrop",
+
+        title: "Change Backdrop",
+
         description:
-            "Backdrops create the world where your game happens.",
-        why:
-            "A good backdrop makes the game easier to understand.",
-        tip:
-            "The Stage has backdrops instead of costumes.",
+            "Backdrops create the world of the project.",
+
         steps: [
 
             {
-                title: "Choose a backdrop",
+                title: "Choose Neon",
+
                 action:
                     "Click the Neon backdrop.",
-                why:
-                    "The Stage background can be changed.",
-                tip:
-                    "Try different backgrounds for different game levels.",
-                backdrop: "neon"
+
+                backdrop:
+                    "neon"
             },
 
             {
-                title: "Try the City backdrop",
+                title: "Try City",
+
                 action:
                     "Click the City backdrop.",
-                why:
-                    "You can switch between different game worlds.",
-                tip:
-                    "Backdrops belong to the Stage.",
-                backdrop: "city"
+
+                backdrop:
+                    "city"
             },
 
             {
                 title: "Return to Space",
+
                 action:
                     "Click the Space backdrop.",
-                why:
-                    "Space will be our AURA PLUS game world.",
-                tip:
-                    "A consistent backdrop helps your game look polished.",
-                backdrop: "space"
+
+                backdrop:
+                    "space"
             },
 
             {
-                title: "Test the Stage",
+                title: "Test it",
+
                 action:
-                    "Click 🟢 RUN.",
-                why:
-                    "The Stage is where players see the final project.",
-                tip:
-                    "Always test your project before showing it.",
-                run: true
+                    "Click the green flag.",
+
+                run:
+                    true
             }
         ]
     },
 
 
     6: {
+
         title: "Add Sound",
+
         description:
             "Sounds make a Scratch project feel alive.",
-        why:
-            "Games use sounds to give feedback to players.",
-        tip:
-            "Scratch has Sound blocks and a Sounds tab.",
+
         steps: [
 
             {
                 title: "Open Sounds",
+
                 action:
                     "Click the Sounds tab.",
-                why:
-                    "The Sounds tab is where sprite sounds are managed.",
-                tip:
-                    "Different sprites can have different sounds.",
-                tab: "sounds"
+
+                tab:
+                    "sounds"
             },
 
             {
-                title: "Choose a sound",
+                title: "Choose Meow",
+
                 action:
                     "Click the Meow sound.",
-                why:
-                    "Selecting a sound prepares it for the project.",
-                tip:
-                    "You can add and manage sounds here.",
-                asset: "sound"
+
+                asset:
+                    "sound",
+
+                assetName:
+                    "Meow"
             },
 
             {
                 title: "Add the sound block",
+
                 action:
                     "Return to Code → Sound and click 'start sound Meow'.",
-                why:
-                    "This block starts a sound.",
-                tip:
-                    "Sound can be used when collecting an orb or winning.",
-                category: "sound",
-                block: "soundstart"
+
+                category:
+                    "sound",
+
+                block:
+                    "soundstart"
             },
 
             {
-                title: "Test the sound",
+                title: "Test it",
+
                 action:
-                    "Click 🟢 RUN.",
-                why:
-                    "Testing helps you check whether your project behaves correctly.",
-                tip:
-                    "Small sound effects make games much more exciting.",
-                run: true
+                    "Click the green flag.",
+
+                run:
+                    true
             }
         ]
     },
 
 
     7: {
+
         title: "Build AURA PLUS",
+
         description:
-            "Now combine sprites, movement, variables, sensing and events into the actual game.",
-        why:
-            "Real Scratch games are made by combining many simple ideas.",
-        tip:
-            "Build one idea at a time, then test the complete game.",
+            "Combine Scratch ideas to understand how a real game works.",
+
         steps: [
 
             {
-                title: "Start AURA PLUS",
+                title: "Start the game",
+
                 action:
-                    "Open Events and click 'when green flag clicked'.",
-                why:
-                    "The green flag starts the complete game.",
-                tip:
-                    "This is the beginning of the actual AURA PLUS script.",
-                category: "events",
-                block: "flag"
+                    "Select AURA and open Events.",
+
+                target:
+                    "sprite-aura"
             },
 
             {
-                title: "Move the player",
+                title: "Add movement",
+
                 action:
                     "Open Motion and click 'change x by 10'.",
-                why:
-                    "Movement lets the player explore the game world.",
-                tip:
-                    "Change the value to control movement distance.",
-                category: "motion",
-                block: "changex"
+
+                category:
+                    "motion",
+
+                block:
+                    "changex"
             },
 
             {
-                title: "Create the score",
+                title: "Create Score",
+
                 action:
-                    "Open Variables and click 'set my variable to 0'.",
-                why:
-                    "A variable can store a game's score.",
-                tip:
-                    "In a real Scratch project, name this variable Score.",
-                category: "variables",
-                block: "setvar"
+                    "Open Variables and click 'set Score to 0'.",
+
+                category:
+                    "variables",
+
+                block:
+                    "setvar"
             },
 
             {
-                title: "Increase the score",
+                title: "Collect points",
+
                 action:
-                    "Click 'change my variable by 1'.",
-                why:
-                    "The score changes when the player collects something.",
-                tip:
-                    "For AURA PLUS, each orb is worth 10 points.",
-                category: "variables",
-                block: "changevar"
+                    "Click 'change Score by 10'.",
+
+                category:
+                    "variables",
+
+                block:
+                    "changevar"
             },
 
             {
-                title: "Detect an object",
+                title: "Sense the Orb",
+
                 action:
-                    "Open Sensing and click 'touching mouse-pointer?'.",
-                why:
-                    "Sensing blocks let Scratch detect what is happening.",
-                tip:
-                    "A real game can use touching [Orb]? instead.",
-                category: "sensing",
-                block: "touching"
+                    "Open Sensing and click 'touching Orb?'.",
+
+                category:
+                    "sensing",
+
+                block:
+                    "touchingorb"
             },
 
             {
                 title: "Make a decision",
+
                 action:
                     "Open Control and click 'if then'.",
-                why:
-                    "An if block lets the game react to a condition.",
-                tip:
-                    "Example: IF touching Orb → change Score by 10.",
-                category: "control",
-                block: "if"
+
+                category:
+                    "control",
+
+                block:
+                    "if"
             },
 
             {
-                title: "Use a comparison",
+                title: "Compare values",
+
                 action:
                     "Open Operators and click '1 > 1'.",
-                why:
-                    "Operators compare values and help games make decisions.",
-                tip:
-                    "Example: IF Score > 40 → unlock the portal.",
-                category: "operators",
-                block: "greater"
+
+                category:
+                    "operators",
+
+                block:
+                    "greater"
             },
 
             {
-                title: "Add the portal idea",
+                title: "Select PORTAL",
+
                 action:
-                    "Select the PORTAL sprite in the Sprite List.",
-                why:
-                    "The portal can become the final destination.",
-                tip:
-                    "Different sprites make the game world feel real.",
-                target: "sprite-portal"
+                    "Click PORTAL in the Sprite List.",
+
+                target:
+                    "sprite-portal"
             },
 
             {
-                title: "Run the real game",
+                title: "Play AURA PLUS",
+
                 action:
-                    "Click 🟢 RUN to launch AURA PLUS.",
-                why:
-                    "Now you get to experience the game you just learned to build.",
-                tip:
-                    "Collect all 5 orbs, avoid SHADOW and reach the portal.",
-                runGame: true
+                    "Click the green flag to launch the actual AURA PLUS game.",
+
+                runGame:
+                    true
             }
         ]
     }
@@ -847,752 +856,157 @@ const lessons = {
 
 
 /* =========================================================
-   INITIALIZE
+   SCREEN NAVIGATION
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+function showScreen(screenId) {
 
-    setupNavigation();
-    setupCategories();
-    setupEditorTabs();
-    setupSprites();
-    setupAssets();
-    setupBackdrops();
-    setupRunButtons();
-    setupLessonButton();
-    setupUndoRedo();
+    $$(".screen").forEach(screen => {
 
-    renderPalette();
-    renderAssets();
-    updateMissionProgress();
+        screen.classList.add("hidden");
 
-    showScreen("introScreen");
-});
-
-
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
-
-function setupNavigation() {
-
-    $("playGameButton")?.addEventListener("click", () => {
-        startGame();
-        showScreen("gameScreen");
+        screen.classList.remove("active");
     });
 
-    $("tutorialButton")?.addEventListener("click", () => {
-        showScreen("tutorialScreen");
-    });
+    const screen = $(screenId);
 
-    $("exitGame")?.addEventListener("click", () => {
-        stopGame();
-        showScreen("introScreen");
-    });
+    if (!screen) return;
 
-    $("secretContinue")?.addEventListener("click", () => {
-        showScreen("tutorialScreen");
-    });
+    screen.classList.remove("hidden");
 
-    $("backToMissions")?.addEventListener("click", () => {
-        stopLessonPreview();
-        showScreen("tutorialScreen");
-    });
-
-    $("replayButton")?.addEventListener("click", () => {
-        showScreen("introScreen");
-    });
-
-    $$(".mission-card").forEach(card => {
-
-        card.addEventListener("click", () => {
-
-            const mission =
-                Number(card.dataset.mission);
-
-            openMission(mission);
-        });
-
-    });
+    screen.classList.add("active");
 }
 
 
 /* =========================================================
-   MISSION
+   OPEN MISSION
    ========================================================= */
 
 function openMission(mission) {
 
+    if (!lessons[mission]) return;
+
     currentMission = mission;
+
     currentStep = 0;
 
-    workspaceBlocks = [];
-    undoStack = [];
-    redoStack = [];
+    selectedSprite = null;
 
-    selectedSprite = "aura";
     selectedCategory = "motion";
 
-    clearWorkspace();
+    selectedAsset = null;
+
+    selectedAssetType = "costumes";
+
+    selectedBackdrop = "space";
+
+    currentEditorTab = "code";
+
+    lastRunCompleted = false;
+
+    /*
+       Completely reset all individual scripts.
+    */
+
+    Object.keys(spriteWorkspaces).forEach(sprite => {
+
+        spriteWorkspaces[sprite] = [];
+    });
+
+    workspaceBlocks = [];
+
+    undoStack.length = 0;
+
+    redoStack.length = 0;
 
     showScreen("lessonScreen");
 
-    updateSpriteSelection();
     renderPalette();
+
+    renderWorkspace();
+
     renderAssets();
 
+    renderBackdrops();
+
     renderLessonStep();
-}
 
-
-function renderLessonStep() {
-
-    const lesson = lessons[currentMission];
-
-    if (!lesson) return;
-
-    const step =
-        lesson.steps[currentStep];
-
-    if (!step) return;
-
-    const total = lesson.steps.length;
-
-    $("lessonNumber").textContent =
-        currentMission;
-
-    $("lessonStep").textContent =
-        `${currentStep + 1}/${total}`;
-
-    $("lessonTitle").textContent =
-        step.title || lesson.title;
-
-    $("lessonDescription").textContent =
-        lesson.description;
-
-    $("actionText").textContent =
-        step.action;
-
-    $("lessonWhy").textContent =
-        step.why || lesson.why;
-
-    $("teacherTip").textContent =
-        step.tip || lesson.tip;
-
-    $("workspaceInstruction").textContent =
-        "Follow the highlighted action, then press NEXT.";
-
-    $("bottomHint").textContent =
-        step.action;
-
-    $("stepProgressBar").style.width =
-        `${((currentStep + 1) / total) * 100}%`;
-
-    $("nextLessonStep").innerHTML =
-        currentStep === total - 1
-            ? `FINISH <span>✓</span>`
-            : `NEXT <span>→</span>`;
-
-    clearHighlights();
-
-    /* Choose the correct category automatically */
-
-    if (step.category) {
-        selectedCategory = step.category;
-        renderPalette();
-    }
-
-    if (step.tab) {
-        switchEditorTab(step.tab);
-    }
-
-    if (step.asset) {
-        renderAssets(step.asset);
-    }
-
-    if (step.backdrop) {
-        selectBackdrop(step.backdrop);
-    }
-
-    if (step.target) {
-        highlightTarget(step.target);
-    }
-
-    if (step.block) {
-        highlightBlock(step.category, step.block);
-    }
-
-    if (step.run) {
-        highlightTarget("run-button");
-    }
-
-    if (step.runGame) {
-        highlightTarget("run-button");
-    }
-
-    updateStatus();
+    updateMissionProgress();
 }
 
 
 /* =========================================================
-   NEXT BUTTON
+   SAVE / LOAD INDIVIDUAL SPRITE SCRIPT
    ========================================================= */
 
-function setupLessonButton() {
+function saveCurrentSpriteScript() {
 
-    $("nextLessonStep")?.addEventListener("click", () => {
+    if (!selectedSprite) return;
 
-        const lesson = lessons[currentMission];
-
-        if (!lesson) return;
-
-        const step =
-            lesson.steps[currentStep];
-
-        /* If this step launches the real game */
-
-        if (step?.runGame) {
-
-            launchAuraPlusFromLesson();
-
-            return;
-        }
-
-        /* If this is a normal run step */
-
-        if (step?.run) {
-            runWorkspace();
-        }
-
-        if (currentStep < lesson.steps.length - 1) {
-
-            currentStep++;
-
-            renderLessonStep();
-
-        } else {
-
-            completeMission();
-
-        }
-
-    });
-}
-
-
-/* =========================================================
-   PALETTE
-   ========================================================= */
-
-function setupCategories() {
-
-    $$(".block-category").forEach(button => {
-
-        button.addEventListener("click", () => {
-
-            selectedCategory =
-                button.dataset.category;
-
-            $$(".block-category").forEach(b =>
-                b.classList.remove("active")
-            );
-
-            button.classList.add("active");
-
-            renderPalette();
-
-        });
-
-    });
-}
-
-
-function renderPalette() {
-
-    const palette = $("blockPalette");
-
-    if (!palette) return;
-
-    const categoryBlocks =
-        blocks[selectedCategory] || [];
-
-    const categoryNames = {
-        motion: "Motion",
-        looks: "Looks",
-        sound: "Sound",
-        events: "Events",
-        control: "Control",
-        sensing: "Sensing",
-        operators: "Operators",
-        variables: "Variables",
-        myblocks: "My Blocks"
-    };
-
-    $("paletteCategory").textContent =
-        categoryNames[selectedCategory] ||
-        selectedCategory;
-
-    palette.innerHTML = "";
-
-    categoryBlocks.forEach(block => {
-
-        const element =
-            document.createElement("button");
-
-        element.className =
-            `scratch-block ${block.className}`;
-
-        element.dataset.block =
-            block.id;
-
-        element.dataset.category =
-            selectedCategory;
-
-        element.textContent =
-            block.text;
-
-        element.addEventListener("click", () => {
-
-            addBlockToWorkspace(
-                selectedCategory,
-                block
-            );
-
-        });
-
-        palette.appendChild(element);
-    });
-
-    /* Reapply current lesson highlight */
-
-    const lesson = lessons[currentMission];
-
-    const step =
-        lesson?.steps[currentStep];
-
-    if (
-        step?.category === selectedCategory &&
-        step?.block
-    ) {
-        highlightBlock(
-            step.category,
-            step.block
-        );
-    }
-}
-
-
-/* =========================================================
-   ADD BLOCK
-   ========================================================= */
-
-function addBlockToWorkspace(category, definition) {
-
-    saveUndo();
-
-    const block = {
-        category,
-        id: definition.id,
-        text: definition.text,
-        className: definition.className,
-        inputs: definition.inputs
-            ? definition.inputs.map(x => ({
-                type: x.type,
-                value: x.value
-            }))
-            : []
-    };
-
-    workspaceBlocks.push(block);
-
-    renderWorkspace();
-
-    $("stepStatus").textContent =
-        "✓ Block added! Press NEXT to continue.";
-
-    $("bottomHint").textContent =
-        "Block added to your script.";
-
-    clearHighlights();
-
-    /* Auto-focus first input */
-
-    setTimeout(() => {
-
-        const last =
-            $("lessonBlocks")
-                ?.lastElementChild;
-
-        const input =
-            last?.querySelector("input");
-
-        input?.focus();
-
-    }, 50);
-}
-
-
-/* =========================================================
-   WORKSPACE
-   ========================================================= */
-
-function clearWorkspace() {
-
-    workspaceBlocks = [];
-
-    renderWorkspace();
-}
-
-
-function renderWorkspace() {
-
-    const workspace =
-        $("lessonBlocks");
-
-    if (!workspace) return;
-
-    workspace.innerHTML = "";
-
-    if (workspaceBlocks.length === 0) {
-
-        workspace.innerHTML = `
-            <div class="empty-workspace" id="emptyWorkspace">
-                <div class="empty-icon">🧩</div>
-                <strong>Your Scratch script starts here</strong>
-                <p>Click the highlighted Scratch block.</p>
-            </div>
-        `;
-
-    } else {
-
-        workspaceBlocks.forEach((block, index) => {
-
-            const el =
-                document.createElement("div");
-
-            el.className =
-                `workspace-block ${block.className}`;
-
-            el.dataset.index =
-                index;
-
-            buildWorkspaceBlock(el, block);
-
-            workspace.appendChild(el);
-
-        });
-
-    }
-
-    const count =
-        workspaceBlocks.length;
-
-    $("blockCount").textContent =
-        `${count} block${count === 1 ? "" : "s"}`;
-
-    $("bottomBlockCount").textContent =
-        count;
-
-    updateRunHint();
-}
-
-
-function buildWorkspaceBlock(el, block) {
-
-    /*
-       Build a visual Scratch-style block.
-       Inputs are REAL editable HTML inputs.
-    */
-
-    const textParts =
-        block.text.split(/(\d+|Hello!|my variable)/g);
-
-    let inputIndex = 0;
-
-    textParts.forEach(part => {
-
-        if (
-            /^\d+$/.test(part) &&
-            block.inputs?.[inputIndex]?.type === "number"
-        ) {
-
-            const input =
-                document.createElement("input");
-
-            input.type = "number";
-
-            input.className =
-                "block-input number-input";
-
-            input.value =
-                block.inputs[inputIndex].value;
-
-            const index =
-                inputIndex;
-
-            input.addEventListener("input", () => {
-
-                block.inputs[index].value =
-                    input.value;
-
-            });
-
-            el.appendChild(input);
-
-            inputIndex++;
-
-        } else if (
-            part === "Hello!" &&
-            block.inputs?.[inputIndex]?.type === "text"
-        ) {
-
-            const input =
-                document.createElement("input");
-
-            input.type = "text";
-
-            input.className =
-                "block-input text-input";
-
-            input.value =
-                block.inputs[inputIndex].value;
-
-            const index =
-                inputIndex;
-
-            input.addEventListener("input", () => {
-
-                block.inputs[index].value =
-                    input.value;
-
-            });
-
-            el.appendChild(input);
-
-            inputIndex++;
-
-        } else if (
-            part.trim() !== ""
-        ) {
-
-            const span =
-                document.createElement("span");
-
-            span.textContent =
-                part;
-
-            el.appendChild(span);
-
-        }
-
-    });
-
-    const deleteButton =
-        document.createElement("button");
-
-    deleteButton.className =
-        "workspace-delete";
-
-    deleteButton.innerHTML =
-        "×";
-
-    deleteButton.title =
-        "Remove block";
-
-    deleteButton.addEventListener("click", event => {
-
-        event.stopPropagation();
-
-        saveUndo();
-
-        const index =
-            Number(el.dataset.index);
-
-        workspaceBlocks.splice(index, 1);
-
-        renderWorkspace();
-
-    });
-
-    el.appendChild(deleteButton);
-}
-
-
-/* =========================================================
-   UNDO / REDO
-   ========================================================= */
-
-function saveUndo() {
-
-    undoStack.push(
+    spriteWorkspaces[selectedSprite] =
         JSON.parse(
             JSON.stringify(workspaceBlocks)
-        )
-    );
-
-    if (undoStack.length > 30)
-        undoStack.shift();
-
-    redoStack = [];
+        );
 }
 
 
-function setupUndoRedo() {
+function loadSpriteScript(sprite) {
 
-    $("undoButton")?.addEventListener(
-        "click",
-        () => {
+    if (!sprite) {
 
-            if (!undoStack.length)
-                return;
+        workspaceBlocks = [];
 
-            redoStack.push(
-                JSON.parse(
-                    JSON.stringify(workspaceBlocks)
-                )
-            );
+        return;
+    }
 
-            workspaceBlocks =
-                undoStack.pop();
-
-            renderWorkspace();
-        }
-    );
-
-    $("redoButton")?.addEventListener(
-        "click",
-        () => {
-
-            if (!redoStack.length)
-                return;
-
-            undoStack.push(
-                JSON.parse(
-                    JSON.stringify(workspaceBlocks)
-                )
-            );
-
-            workspaceBlocks =
-                redoStack.pop();
-
-            renderWorkspace();
-        }
-    );
+    workspaceBlocks =
+        JSON.parse(
+            JSON.stringify(
+                spriteWorkspaces[sprite] || []
+            )
+        );
 }
 
 
 /* =========================================================
-   HIGHLIGHTING
+   SELECT SPRITE
    ========================================================= */
 
-function clearHighlights() {
+function selectSprite(sprite) {
 
-    $$(".lesson-target").forEach(el => {
-        el.classList.remove("lesson-target");
-    });
-}
+    /*
+       FIRST save the script belonging to
+       the sprite we were previously editing.
+    */
 
+    saveCurrentSpriteScript();
 
-function highlightTarget(target) {
+    selectedSprite = sprite;
 
-    clearHighlights();
+    /*
+       NOW load the newly selected sprite's
+       own script.
+    */
 
-    let element = null;
+    loadSpriteScript(sprite);
 
-    switch (target) {
+    updateSpriteSelection();
 
-        case "sprite-aura":
-            element =
-                qs('.sprite-card[data-sprite="aura"]');
-            break;
+    renderWorkspace();
 
-        case "sprite-shadow":
-            element =
-                qs('.sprite-card[data-sprite="shadow"]');
-            break;
+    renderAssets();
 
-        case "sprite-portal":
-            element =
-                qs('.sprite-card[data-sprite="portal"]');
-            break;
-
-        case "sprite-orb":
-            element =
-                qs('.sprite-card[data-sprite="orb"]');
-            break;
-
-        case "choose-sprite":
-            element =
-                $("chooseSpriteButton");
-            break;
-
-        case "run-button":
-            element =
-                $("runLessonButton");
-            break;
-
-        default:
-            break;
-    }
-
-    if (element) {
-
-        element.classList.add("lesson-target");
-
-        element.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest"
-        });
-
-    }
-}
-
-
-function highlightBlock(category, blockId) {
+    updateStageSprite();
 
     clearHighlights();
-
-    if (selectedCategory !== category) {
-        selectedCategory = category;
-        renderPalette();
-    }
-
-    const element =
-        qs(
-            `.scratch-block[data-block="${blockId}"]`
-        );
-
-    if (element) {
-
-        element.classList.add("lesson-target");
-
-        element.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest"
-        });
-
-    }
-}
-
-
-function updateStatus() {
-
-    const lesson =
-        lessons[currentMission];
-
-    const step =
-        lesson?.steps[currentStep];
-
-    if (!step) return;
 
     $("stepStatus").textContent =
-        "Follow the highlighted action.";
-
+        `✓ ${capitalize(sprite)} selected. Its own script is shown.`;
 }
 
 
 /* =========================================================
-   SPRITES
+   SPRITE UI
    ========================================================= */
 
 function setupSprites() {
@@ -1601,76 +1015,74 @@ function setupSprites() {
 
         card.addEventListener("click", () => {
 
-            selectedSprite =
-                card.dataset.sprite;
-
-            updateSpriteSelection();
-
-            renderAssets();
-
-            $("stepStatus").textContent =
-                `✓ ${capitalize(selectedSprite)} selected.`;
-
-            clearHighlights();
+            selectSprite(
+                card.dataset.sprite
+            );
 
         });
 
     });
 
-    $("chooseSpriteButton")?.addEventListener(
+
+    $("chooseSpriteButton")
+        ?.addEventListener(
+            "click",
+            addStarSprite
+        );
+}
+
+
+function addStarSprite() {
+
+    if (
+        qs(
+            '.sprite-card[data-sprite="star"]'
+        )
+    ) {
+
+        $("stepStatus").textContent =
+            "Star is already in the Sprite List.";
+
+        return;
+    }
+
+    const list = $("spriteList");
+
+    if (!list) return;
+
+    const card =
+        document.createElement("button");
+
+    card.className =
+        "sprite-card";
+
+    card.dataset.sprite =
+        "star";
+
+    card.innerHTML = `
+        <span class="sprite-thumb">
+            ★
+        </span>
+
+        <span>
+            <b>Star</b>
+            <small>Sprite</small>
+        </span>
+    `;
+
+    card.addEventListener(
         "click",
-        () => {
-
-            /*
-               Simulated Scratch sprite picker.
-               Adds a new sprite visually.
-            */
-
-            if (
-                qs(
-                    '.sprite-card[data-sprite="star"]'
-                )
-            ) return;
-
-            const list =
-                $("spriteList");
-
-            const card =
-                document.createElement("button");
-
-            card.className =
-                "sprite-card";
-
-            card.dataset.sprite =
-                "star";
-
-            card.innerHTML = `
-                <div class="sprite-thumb portal-thumb">
-                    ★
-                </div>
-                <div class="sprite-meta">
-                    <strong>Star</strong>
-                    <small>Sprite</small>
-                </div>
-            `;
-
-            card.addEventListener("click", () => {
-
-                selectedSprite = "star";
-
-                updateSpriteSelection();
-                renderAssets();
-
-            });
-
-            list.appendChild(card);
-
-            $("stepStatus").textContent =
-                "✓ New sprite added!";
-
-            clearHighlights();
-        }
+        () => selectSprite("star")
     );
+
+    list.appendChild(card);
+
+    spriteWorkspaces.star = [];
+
+    $("stepStatus").textContent =
+        "✓ New Star sprite added.";
+
+    clearHighlights();
 }
 
 
@@ -1685,7 +1097,313 @@ function updateSpriteSelection() {
 
     });
 
-    updateStageSprite();
+    const label =
+        $("activeSpriteLabel");
+
+    if (label) {
+
+        label.textContent =
+            selectedSprite
+                ? `Editing: ${capitalize(selectedSprite)}`
+                : "No sprite selected";
+    }
+}
+
+
+/* =========================================================
+   CATEGORIES
+   ========================================================= */
+
+function setupCategories() {
+
+    $$(".block-category")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    selectedCategory =
+                        button.dataset.category;
+
+                    $$(".block-category")
+                        .forEach(item => {
+
+                            item.classList.toggle(
+                                "active",
+                                item === button
+                            );
+
+                        });
+
+                    renderPalette();
+
+                    clearHighlights();
+
+                    /*
+                       If this is the required category
+                       for the current lesson, highlight
+                       the required block — but DO NOT
+                       click/select it automatically.
+                    */
+
+                    const step =
+                        lessons[currentMission]
+                            ?.steps[currentStep];
+
+                    if (
+                        step?.category === selectedCategory &&
+                        step?.block
+                    ) {
+
+                        highlightBlockOnly(
+                            step.block
+                        );
+                    }
+                }
+            );
+
+        });
+}
+
+
+/* =========================================================
+   PALETTE
+   ========================================================= */
+
+function renderPalette() {
+
+    const palette =
+        $("blockPalette");
+
+    if (!palette) return;
+
+    palette.innerHTML = "";
+
+    const list =
+        scratchBlocks[selectedCategory] || [];
+
+    list.forEach(def => {
+
+        const block =
+            document.createElement("button");
+
+        block.className =
+            `scratch-block palette-block block-${def.color}`;
+
+        block.dataset.block =
+            def.id;
+
+        block.dataset.category =
+            selectedCategory;
+
+        block.textContent =
+            def.text;
+
+        block.addEventListener(
+            "click",
+            () => {
+
+                addBlockToWorkspace(
+                    def
+                );
+
+            }
+        );
+
+        palette.appendChild(block);
+
+    });
+}
+
+
+/* =========================================================
+   ADD BLOCK
+   ========================================================= */
+
+function addBlockToWorkspace(def) {
+
+    if (!selectedSprite) {
+
+        $("stepStatus").textContent =
+            "⚠️ Select a sprite before adding code.";
+
+        return;
+    }
+
+    undoStack.push(
+        JSON.parse(
+            JSON.stringify(workspaceBlocks)
+        )
+    );
+
+    redoStack.length = 0;
+
+    workspaceBlocks.push({
+
+        id: def.id,
+
+        text: def.text,
+
+        category:
+            selectedCategory,
+
+        className:
+            `block-${def.color}`
+
+    });
+
+    saveCurrentSpriteScript();
+
+    renderWorkspace();
+
+    lastRunCompleted = false;
+
+    clearHighlights();
+
+    $("stepStatus").textContent =
+        `✓ "${def.text}" added to ${capitalize(selectedSprite)}.`;
+}
+
+
+/* =========================================================
+   WORKSPACE
+   ========================================================= */
+
+function renderWorkspace() {
+
+    const workspace =
+        $("lessonBlocks");
+
+    if (!workspace) return;
+
+    workspace.innerHTML = "";
+
+    if (!selectedSprite) {
+
+        workspace.innerHTML = `
+            <div class="workspace-empty">
+                <div style="font-size:36px">👆</div>
+                <strong>Select a sprite to see its scripts.</strong>
+                <br>
+                <small>
+                    AURA, SHADOW, ORB and PORTAL each have their own code.
+                </small>
+            </div>
+        `;
+
+        return;
+    }
+
+
+    if (!workspaceBlocks.length) {
+
+        workspace.innerHTML = `
+            <div class="workspace-empty">
+                <div style="font-size:36px">🧩</div>
+                <strong>
+                    No blocks in ${capitalize(selectedSprite)}'s script yet.
+                </strong>
+                <br>
+                <small>
+                    Click a Scratch block to add it.
+                </small>
+            </div>
+        `;
+
+    } else {
+
+        const wrapper =
+            document.createElement("div");
+
+        wrapper.className =
+            "workspace-blocks";
+
+        workspaceBlocks.forEach(
+            (block,index) => {
+
+                const element =
+                    document.createElement("div");
+
+                element.className =
+                    `workspace-block ${block.className || ""}`;
+
+                element.dataset.index =
+                    index;
+
+                const text =
+                    document.createElement("span");
+
+                text.textContent =
+                    block.text;
+
+                element.appendChild(text);
+
+
+                const remove =
+                    document.createElement("button");
+
+                remove.className =
+                    "block-delete";
+
+                remove.textContent =
+                    "×";
+
+                remove.title =
+                    "Delete block";
+
+
+                remove.addEventListener(
+                    "click",
+                    event => {
+
+                        event.stopPropagation();
+
+                        undoStack.push(
+                            JSON.parse(
+                                JSON.stringify(
+                                    workspaceBlocks
+                                )
+                            )
+                        );
+
+                        redoStack.length = 0;
+
+                        workspaceBlocks.splice(
+                            index,
+                            1
+                        );
+
+                        saveCurrentSpriteScript();
+
+                        renderWorkspace();
+
+                        lastRunCompleted = false;
+                    }
+                );
+
+                element.appendChild(remove);
+
+                wrapper.appendChild(element);
+
+            }
+        );
+
+        workspace.appendChild(wrapper);
+    }
+
+
+    if ($("selectedTarget")) {
+
+        $("selectedTarget").textContent =
+            capitalize(selectedSprite);
+    }
+
+    if ($("blockCount")) {
+
+        $("blockCount").textContent =
+            `${workspaceBlocks.length} block${workspaceBlocks.length === 1 ? "" : "s"}`;
+    }
 }
 
 
@@ -1695,388 +1413,132 @@ function updateSpriteSelection() {
 
 function setupEditorTabs() {
 
-    $$(".editor-tab").forEach(tab => {
-
-        tab.addEventListener("click", () => {
-
-            switchEditorTab(
-                tab.dataset.tab
-            );
-
-        });
-
-    });
-
-    $$(".asset-tab").forEach(tab => {
-
-        tab.addEventListener("click", () => {
-
-            selectedAsset =
-                tab.dataset.asset;
-
-            $$(".asset-tab").forEach(t =>
-                t.classList.remove("active")
-            );
-
-            tab.classList.add("active");
-
-            renderAssets();
-
-        });
-
-    });
-}
-
-
-function switchEditorTab(tabName) {
-
-    // Update top tabs
-    $$(".editor-tab").forEach(tab => {
-        tab.classList.toggle(
-            "active",
-            tab.dataset.tab === tabName
-        );
-    });
-
-    const editorBody = document.querySelector(".scratch-editor-body");
-    if (!editorBody) return;
-
-    const categories = editorBody.querySelector(".block-categories");
-    const palette = editorBody.querySelector(".block-palette");
-    const workspace = editorBody.querySelector(".script-workspace");
-    const rightPanel = editorBody.querySelector(".scratch-right-panel");
-
-    // CODE MODE
-    if (tabName === "code") {
-
-        editorBody.classList.remove(
-            "costume-mode",
-            "sound-mode"
-        );
-
-        categories?.classList.remove("editor-hidden");
-        palette?.classList.remove("editor-hidden");
-        workspace?.classList.remove("editor-hidden");
-
-        renderAssetEditor(null);
-
-        clearHighlights();
-        return;
-    }
-
-    // COSTUME MODE
-    if (tabName === "costumes") {
-
-        editorBody.classList.remove("sound-mode");
-        editorBody.classList.add("costume-mode");
-
-        categories?.classList.add("editor-hidden");
-        palette?.classList.add("editor-hidden");
-        workspace?.classList.add("editor-hidden");
-
-        renderAssetEditor("costumes");
-
-        selectedAsset = "costumes";
-        renderAssets("costumes");
-
-        clearHighlights();
-        return;
-    }
-
-   function renderAssetEditor(type) {
-
-    const editorBody =
-        document.querySelector(".scratch-editor-body");
-
-    if (!editorBody) return;
-
-    let panel =
-        document.getElementById("assetEditorWorkspace");
-
-    if (!type) {
-        panel?.remove();
-        return;
-    }
-
-    if (!panel) {
-
-        panel = document.createElement("section");
-
-        panel.id = "assetEditorWorkspace";
-        panel.className = "asset-editor-workspace";
-
-        const rightPanel =
-            editorBody.querySelector(".scratch-right-panel");
-
-        editorBody.insertBefore(panel, rightPanel);
-    }
-
-    const data =
-        spriteAssets[selectedSprite] ||
-        spriteAssets.aura;
-
-    const assets =
-        data[type] || [];
-
-    const title =
-        type === "costumes"
-            ? "Costumes"
-            : "Sounds";
-
-    const icon =
-        type === "costumes"
-            ? "🎭"
-            : "🔊";
-
-    panel.innerHTML = `
-        <div class="asset-editor-top">
-
-            <div>
-                <div class="asset-editor-eyebrow">
-                    SCRATCH 3 • ${title.toUpperCase()}
-                </div>
-
-                <h2>
-                    ${icon} ${title}
-                </h2>
-
-                <p>
-                    ${type === "costumes"
-                        ? "Choose a costume for the selected sprite."
-                        : "Choose a sound for the selected sprite."}
-                </p>
-            </div>
-
-            <div class="asset-editor-sprite">
-                <span class="asset-editor-sprite-icon">
-                    ${getSpriteIcon(selectedSprite)}
-                </span>
-
-                <strong>
-                    ${capitalize(selectedSprite)}
-                </strong>
-
-                <small>
-                    Selected Sprite
-                </small>
-            </div>
-
-        </div>
-
-        <div class="asset-editor-canvas">
-
-            ${
-                type === "costumes"
-                    ? `
-                        <div class="costume-canvas">
-                            <div class="costume-grid"></div>
-
-                            <div
-                                id="costumePreview"
-                                class="big-costume-preview"
-                            >
-                                ${getSpriteIcon(selectedSprite)}
-                            </div>
-
-                            <div class="canvas-label">
-                                COSTUME EDITOR
-                            </div>
-                        </div>
-                    `
-                    : `
-                        <div class="sound-editor">
-
-                            <div class="sound-icon">
-                                🔊
-                            </div>
-
-                            <div class="sound-wave">
-                                ${Array.from(
-                                    {length: 42},
-                                    (_, i) =>
-                                        `<i style="height:${12 + ((i * 17) % 38)}px"></i>`
-                                ).join("")}
-                            </div>
-
-                            <div class="canvas-label">
-                                SOUND EDITOR
-                            </div>
-
-                        </div>
-                    `
-            }
-
-        </div>
-
-        <div class="asset-editor-library">
-
-            <div class="asset-library-heading">
-                <strong>
-                    ${title.toUpperCase()}
-                </strong>
-
-                <span>
-                    ${assets.length} ${type === "costumes"
-                        ? "costumes"
-                        : "sounds"}
-                </span>
-            </div>
-
-            <div
-                id="centralAssetLibrary"
-                class="central-asset-library"
-            >
-                ${assets.map((asset, index) => `
-                    <button
-                        class="central-asset-card ${index === 0 ? "selected" : ""}"
-                        data-central-asset="${asset}"
-                    >
-
-                        <div class="central-asset-thumb">
-                            ${
-                                type === "sounds"
-                                    ? "🔊"
-                                    : getCostumeIcon(
-                                        selectedSprite,
-                                        index
-                                    )
-                            }
-                        </div>
-
-                        <strong>
-                            ${asset}
-                        </strong>
-
-                    </button>
-                `).join("")}
-
-                <button
-                    class="central-add-asset"
-                    id="centralAddAsset"
-                >
-                    +
-                    <span>
-                        Choose a ${type === "costumes"
-                            ? "Costume"
-                            : "Sound"}
-                    </span>
-                </button>
-
-            </div>
-
-        </div>
-    `;
-
-    $$(".central-asset-card").forEach(card => {
-
-        card.addEventListener("click", () => {
-
-            $$(".central-asset-card").forEach(c =>
-                c.classList.remove("selected")
-            );
-
-            card.classList.add("selected");
-
-            const asset =
-                card.dataset.centralAsset;
-
-            if (type === "costumes") {
-
-                updateStageCostume(asset);
-
-                const preview =
-                    document.getElementById(
-                        "costumePreview"
+    $$(".project-tab")
+        .forEach(tab => {
+
+            tab.addEventListener(
+                "click",
+                () => {
+
+                    switchEditorTab(
+                        tab.dataset.editorTab
                     );
 
-                if (preview) {
-                    preview.textContent =
-                        getCostumeIcon(
-                            selectedSprite,
-                            assets.indexOf(asset)
-                        );
                 }
+            );
 
-            } else {
-
-                playSound(asset);
-            }
-
-            if ($("stepStatus")) {
-                $("stepStatus").textContent =
-                    `✓ ${asset} selected.`;
-            }
-        });
-    });
-
-    document
-        .getElementById("centralAddAsset")
-        ?.addEventListener("click", () => {
-
-            if ($("stepStatus")) {
-                $("stepStatus").textContent =
-                    `✓ Choose a ${type === "costumes"
-                        ? "costume"
-                        : "sound"} for ${capitalize(selectedSprite)}.`;
-            }
         });
 }
 
 
-function getSpriteIcon(sprite) {
+function switchEditorTab(
+    tabName,
+    clear = true
+) {
 
-    const icons = {
-        aura: "A",
-        shadow: "👾",
-        orb: "●",
-        portal: "✦",
-        star: "★"
-    };
+    currentEditorTab =
+        tabName;
 
-    return icons[sprite] || "●";
-}
+    $$(".project-tab")
+        .forEach(tab => {
 
+            tab.classList.toggle(
+                "active",
+                tab.dataset.editorTab === tabName
+            );
 
-function getCostumeIcon(sprite, index) {
-
-    const icons = {
-        aura: ["A", "✨", "🏃"],
-        shadow: ["👾", "😈"],
-        orb: ["●", "💫"],
-        portal: ["✦", "🌀"],
-        star: ["★"]
-    };
-
-    return (
-        icons[sprite]?.[index] ||
-        getSpriteIcon(sprite)
-    );
-}
+        });
 
 
-function capitalize(text) {
+    const categories =
+        $(".block-categories");
 
-    return text.charAt(0).toUpperCase() +
-           text.slice(1);
-}
-   
-    // SOUND MODE
-    if (tabName === "sounds") {
+    const palette =
+        $(".block-palette");
 
-        editorBody.classList.remove("costume-mode");
-        editorBody.classList.add("sound-mode");
 
-        categories?.classList.add("editor-hidden");
-        palette?.classList.add("editor-hidden");
-        workspace?.classList.add("editor-hidden");
+    if (tabName === "code") {
 
-        renderAssetEditor("sounds");
+        categories?.classList.remove("hidden");
 
-        selectedAsset = "sounds";
-        renderAssets("sounds");
+        palette?.classList.remove("hidden");
 
-        clearHighlights();
+        renderWorkspace();
+
+    } else {
+
+        categories?.classList.add("hidden");
+
+        palette?.classList.add("hidden");
+
+        const workspace =
+            $("lessonBlocks");
+
+        if (workspace) {
+
+            workspace.innerHTML = `
+                <div class="workspace-empty">
+
+                    <div style="font-size:42px">
+                        ${tabName === "costumes" ? "🎭" : "🔊"}
+                    </div>
+
+                    <strong>
+                        ${capitalize(tabName)}
+                    </strong>
+
+                    <br>
+
+                    <small>
+                        Choose an asset from the library.
+                    </small>
+
+                </div>
+            `;
+        }
     }
+
+
+    renderAssets();
+
+    if (clear)
+        clearHighlights();
+}
+
+
+/* =========================================================
+   ASSET TABS
+   ========================================================= */
+
+function setupAssetTabs() {
+
+    $$(".asset-tab")
+        .forEach(tab => {
+
+            tab.addEventListener(
+                "click",
+                () => {
+
+                    selectedAssetType =
+                        tab.dataset.asset;
+
+                    $$(".asset-tab")
+                        .forEach(item => {
+
+                            item.classList.toggle(
+                                "active",
+                                item === tab
+                            );
+
+                        });
+
+                    renderAssets();
+
+                    clearHighlights();
+                }
+            );
+
+        });
 }
 
 
@@ -2084,69 +1546,26 @@ function capitalize(text) {
    ASSETS
    ========================================================= */
 
-const spriteAssets = {
-
-    aura: {
-        costumes: ["AURA", "AURA GLOW", "AURA RUN"],
-        sounds: ["Meow", "Pop", "Collect"]
-    },
-
-    shadow: {
-        costumes: ["Shadow", "Shadow Attack"],
-        sounds: ["Boom", "Buzz"]
-    },
-
-    orb: {
-        costumes: ["Orb", "Orb Glow"],
-        sounds: ["Pop", "Collect"]
-    },
-
-    portal: {
-        costumes: ["Portal", "Portal Open"],
-        sounds: ["Magic", "Win"]
-    },
-
-    star: {
-        costumes: ["Star"],
-        sounds: ["Pop"]
-    }
-};
-
-
-function setupAssets() {
-    renderAssets();
-}
-
-
-function renderAssets(forceType = null) {
+function renderAssets() {
 
     const library =
         $("assetLibrary");
 
     if (!library) return;
 
-    let type =
-        forceType === "costume"
-            ? "costumes"
-            : forceType === "sound"
-                ? "sounds"
-                : selectedAsset;
-
-    if (type !== "costumes" && type !== "sounds")
-        type = "costumes";
-
-    selectedAsset = type;
+    const sprite =
+        selectedSprite || "aura";
 
     const data =
-        spriteAssets[selectedSprite] ||
+        spriteAssets[sprite] ||
         spriteAssets.aura;
 
     const assets =
-        data[type] || [];
+        data[selectedAssetType] || [];
 
     library.innerHTML = "";
 
-    assets.forEach((asset, index) => {
+    assets.forEach(asset => {
 
         const button =
             document.createElement("button");
@@ -2157,48 +1576,58 @@ function renderAssets(forceType = null) {
         button.dataset.asset =
             asset;
 
-        button.innerHTML =
-            type === "sounds"
-                ? "🔊"
-                : index === 0
-                    ? "A"
-                    : "🎭";
+        button.innerHTML = `
+            <span class="asset-icon">
+                ${selectedAssetType === "sounds" ? "🔊" : "🎭"}
+            </span>
 
-        button.title =
-            asset;
+            <span>${asset}</span>
+        `;
 
-        button.addEventListener("click", () => {
+        button.addEventListener(
+            "click",
+            () => {
 
-            $$(".asset-item").forEach(a =>
-                a.classList.remove("selected")
-            );
+                selectedAsset =
+                    asset;
 
-            button.classList.add("selected");
+                $$(".asset-item")
+                    .forEach(item => {
 
-            $("stepStatus").textContent =
-                `✓ ${asset} selected.`;
+                        item.classList.remove(
+                            "selected"
+                        );
 
-            if (type === "costumes") {
-                updateStageCostume(asset);
+                    });
+
+                button.classList.add(
+                    "selected"
+                );
+
+                clearHighlights();
+
+                if (
+                    selectedAssetType ===
+                    "costumes"
+                ) {
+
+                    updateStageCostume(
+                        asset
+                    );
+
+                } else {
+
+                    playSound(
+                        asset
+                    );
+                }
+
+                $("stepStatus").textContent =
+                    `✓ ${asset} selected.`;
             }
-
-            if (type === "sounds") {
-                playSound(asset);
-            }
-
-            clearHighlights();
-        });
-
-        library.appendChild(button);
-    });
-
-    $$(".asset-tab").forEach(tab => {
-
-        tab.classList.toggle(
-            "active",
-            tab.dataset.asset === type
         );
 
+        library.appendChild(button);
     });
 }
 
@@ -2209,30 +1638,39 @@ function renderAssets(forceType = null) {
 
 function setupBackdrops() {
 
-    $$(".backdrop-card").forEach(card => {
+    renderBackdrops();
 
-        card.addEventListener("click", () => {
+    $("backdropLibrary")
+        ?.addEventListener(
+            "click",
+            event => {
 
-            selectBackdrop(
-                card.dataset.backdrop
-            );
+                const card =
+                    event.target.closest(
+                        ".backdrop-card"
+                    );
 
-        });
+                if (!card) return;
 
-    });
+                selectBackdrop(
+                    card.dataset.backdrop
+                );
+            }
+        );
+}
 
-    $("chooseBackdropButton")?.addEventListener(
-        "click",
-        () => {
 
-            const library =
-                $("backdropLibrary");
+function renderBackdrops() {
 
-            if (
-                qs(
-                    '.backdrop-card[data-backdrop="sunset"]'
-                )
-            ) return;
+    const library =
+        $("backdropLibrary");
+
+    if (!library) return;
+
+    library.innerHTML = "";
+
+    ["space","neon","city"]
+        .forEach(name => {
 
             const card =
                 document.createElement("button");
@@ -2241,526 +1679,866 @@ function setupBackdrops() {
                 "backdrop-card";
 
             card.dataset.backdrop =
-                "sunset";
+                name;
 
             card.innerHTML = `
-                <div class="backdrop-thumb"
-                     style="background:linear-gradient(#f97316,#7c3aed,#111827)">
+                <div
+                    class="backdrop-thumb"
+                    style="
+                        background:${backdropData[name]}
+                    ">
                 </div>
-                <small>Sunset</small>
+
+                <small>
+                    ${capitalize(name)}
+                </small>
             `;
 
-            card.addEventListener("click", () => {
-                selectBackdrop("sunset");
-            });
-
             library.appendChild(card);
-        }
+        });
+
+    selectBackdropVisual(
+        selectedBackdrop
     );
 }
 
 
 function selectBackdrop(name) {
 
-    $$(".backdrop-card").forEach(card => {
+    selectedBackdrop =
+        name;
 
-        card.classList.toggle(
-            "selected",
-            card.dataset.backdrop === name
-        );
+    selectBackdropVisual(
+        name
+    );
 
-    });
-
-    const stage =
-        $("previewStage");
-
-    const bg =
-        stage?.querySelector(".stage-background");
-
-    if (!bg) return;
-
-    const backgrounds = {
-
-        space:
-            "radial-gradient(circle at 50% 45%, #172554, #07101e 75%)",
-
-        neon:
-            "linear-gradient(135deg,#7c3aed,#0891b2)",
-
-        city:
-            "linear-gradient(180deg,#38bdf8 0 50%,#334155 50%)",
-
-        sunset:
-            "linear-gradient(180deg,#f97316,#7c3aed,#111827)"
-    };
-
-    bg.style.background =
-        backgrounds[name] ||
-        backgrounds.space;
+    clearHighlights();
 
     $("stepStatus").textContent =
         `✓ ${capitalize(name)} backdrop selected.`;
+}
+
+
+function selectBackdropVisual(name) {
+
+    $$(".backdrop-card")
+        .forEach(card => {
+
+            card.classList.toggle(
+                "selected",
+                card.dataset.backdrop === name
+            );
+
+        });
+
+    const scene =
+        $("stageBackground");
+
+    if (scene) {
+
+        scene.style.background =
+            backdropData[name] ||
+            backdropData.space;
+    }
+}
+
+
+/* =========================================================
+   HIGHLIGHT SYSTEM
+   ========================================================= */
+
+function clearHighlights() {
+
+    $$(".lesson-target")
+        .forEach(element => {
+
+            element.classList.remove(
+                "lesson-target"
+            );
+
+        });
+}
+
+
+function addHighlight(element) {
+
+    if (!element) return;
+
+    element.classList.add(
+        "lesson-target"
+    );
+
+    element.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest"
+    });
+}
+
+
+function highlightTarget(target) {
 
     clearHighlights();
-}
 
+    const map = {
 
-/* =========================================================
-   RUN BUTTONS
-   ========================================================= */
+        "sprite-aura":
+            '.sprite-card[data-sprite="aura"]',
 
-function setupRunButtons() {
+        "sprite-shadow":
+            '.sprite-card[data-sprite="shadow"]',
 
-    $("runLessonButton")?.addEventListener(
-        "click",
-        () => runWorkspace()
-    );
+        "sprite-orb":
+            '.sprite-card[data-sprite="orb"]',
 
-    $("lessonFlag")?.addEventListener(
-        "click",
-        () => runWorkspace()
-    );
+        "sprite-portal":
+            '.sprite-card[data-sprite="portal"]',
 
-    $("lessonStop")?.addEventListener(
-        "click",
-        () => stopLessonPreview()
-    );
+        "choose-sprite":
+            "#chooseSpriteButton",
 
-    $("stageGreenFlag")?.addEventListener(
-        "click",
-        () => runWorkspace()
-    );
-
-    $("stageStop")?.addEventListener(
-        "click",
-        () => stopLessonPreview()
-    );
-}
-
-
-function updateRunHint() {
-
-    const count =
-        workspaceBlocks.length;
-
-    if ($("bottomHint")) {
-
-        $("bottomHint").textContent =
-            count
-                ? `${count} block${count === 1 ? "" : "s"} ready — click RUN to test.`
-                : "Click the highlighted block to add it to your script.";
-    }
-}
-
-
-/* =========================================================
-   WORKSPACE RUNNER
-   ========================================================= */
-
-function runWorkspace() {
-
-    const preview =
-        $("previewPlayer");
-
-    if (!preview) return;
-
-    stopLessonPreview();
-
-    let x = 50;
-    let y = 50;
-
-    let direction = 90;
-    let size = 100;
-
-    let stepIndex = 0;
-
-    const blocksToRun =
-        [...workspaceBlocks];
-
-    function executeNext() {
-
-        if (stepIndex >= blocksToRun.length) {
-
-            $("stepStatus").textContent =
-                "✓ Script finished running.";
-
-            return;
-        }
-
-        const block =
-            blocksToRun[stepIndex];
-
-        const value =
-            Number(block.inputs?.[0]?.value || 10);
-
-        switch (block.id) {
-
-            case "move":
-                x += value / 2;
-                break;
-
-            case "changex":
-                x += value / 2;
-                break;
-
-            case "changey":
-                y -= value / 2;
-                break;
-
-            case "setx":
-                x = 50 + value / 2;
-                break;
-
-            case "sety":
-                y = 50 - value / 2;
-                break;
-
-            case "random":
-                x = 15 + Math.random() * 70;
-                y = 15 + Math.random() * 70;
-                break;
-
-            case "turn":
-                direction += value;
-                preview.style.transform =
-                    `translate(-50%,-50%) rotate(${direction}deg)`;
-                break;
-
-            case "size":
-                size =
-                    clamp(
-                        size + value,
-                        40,
-                        180
-                    );
-
-                preview.style.width =
-                    `${30 * size / 100}px`;
-
-                preview.style.height =
-                    `${30 * size / 100}px`;
-
-                break;
-
-            case "nextcostume":
-                updateStageCostume("AURA GLOW");
-                break;
-
-            case "say":
-                showStageBubble(
-                    block.inputs?.[0]?.value ||
-                    "Hello!"
-                );
-                break;
-
-            case "soundstart":
-            case "soundwait":
-                playSound("Pop");
-                break;
-
-            case "flag":
-                resetPreview();
-                break;
-
-            case "setvar":
-            case "changevar":
-                pulseStage();
-                break;
-
-            case "bounce":
-                x = clamp(x, 10, 90);
-                y = clamp(y, 10, 90);
-                break;
-
-            default:
-                break;
-        }
-
-        x = clamp(x, 8, 92);
-        y = clamp(y, 10, 88);
-
-        preview.style.left =
-            `${x}%`;
-
-        preview.style.top =
-            `${y}%`;
-
-        stepIndex++;
-
-        setTimeout(
-            executeNext,
-            300
-        );
-    }
-
-    executeNext();
-}
-
-
-function resetPreview() {
-
-    const preview =
-        $("previewPlayer");
-
-    if (!preview) return;
-
-    preview.style.left = "50%";
-    preview.style.top = "50%";
-
-    preview.style.width = "30px";
-    preview.style.height = "30px";
-
-    preview.style.transform =
-        "translate(-50%,-50%)";
-
-    hideStageBubble();
-}
-
-
-function stopLessonPreview() {
-
-    if (gameAnimation) {
-        cancelAnimationFrame(gameAnimation);
-        gameAnimation = null;
-    }
-
-    resetPreview();
-}
-
-
-/* =========================================================
-   STAGE EFFECTS
-   ========================================================= */
-
-function updateStageSprite() {
-
-    const preview =
-        $("previewPlayer");
-
-    if (!preview) return;
-
-    const sprites = {
-
-        aura: {
-            text: "A",
-            background:
-                "radial-gradient(circle,#fff,#a78bfa 45%,#7c3aed)"
-        },
-
-        shadow: {
-            text: "👾",
-            background:
-                "linear-gradient(135deg,#111827,#7f1d1d)"
-        },
-
-        orb: {
-            text: "●",
-            background:
-                "radial-gradient(circle,#fff,#22d3ee)"
-        },
-
-        portal: {
-            text: "✦",
-            background:
-                "radial-gradient(circle,#fff,#8b5cf6)"
-        },
-
-        star: {
-            text: "★",
-            background:
-                "radial-gradient(circle,#fff,#facc15)"
-        }
+        "run-button":
+            "#stageGreenFlag"
     };
 
-    const data =
-        sprites[selectedSprite] ||
-        sprites.aura;
-
-    preview.textContent =
-        data.text;
-
-    preview.style.background =
-        data.background;
+    addHighlight(
+        qs(map[target])
+    );
 }
 
 
-function updateStageCostume(costume) {
+function highlightCategory(category) {
 
-    const preview =
-        $("previewPlayer");
+    clearHighlights();
 
-    if (!preview) return;
+    addHighlight(
+        qs(
+            `.block-category[data-category="${category}"]`
+        )
+    );
+}
 
-    if (
-        costume.toLowerCase().includes("glow")
-    ) {
 
-        preview.style.boxShadow =
-            "0 0 35px #c4b5fd";
+function highlightBlockOnly(id) {
 
-    } else {
+    addHighlight(
+        qs(
+            `.scratch-block[data-block="${id}"]`
+        )
+    );
+}
 
-        preview.style.boxShadow =
-            "0 0 18px #8b5cf6";
 
+function highlightEditorTab(tab) {
+
+    clearHighlights();
+
+    addHighlight(
+        qs(
+            `.project-tab[data-editor-tab="${tab}"]`
+        )
+    );
+}
+
+
+function highlightAsset(name) {
+
+    clearHighlights();
+
+    addHighlight(
+        qs(
+            `.asset-item[data-asset="${CSS.escape(name)}"]`
+        )
+    );
+}
+
+
+function highlightBackdrop(name) {
+
+    clearHighlights();
+
+    addHighlight(
+        qs(
+            `.backdrop-card[data-backdrop="${name}"]`
+        )
+    );
+}
+
+
+/* =========================================================
+   PART 1 ENDS HERE
+   ========================================================= */
+/* =========================================================
+   AURA PLUS — PART 2 / 3
+   LESSON ENGINE + VERIFICATION + RUNNER
+   ========================================================= */
+
+
+/* =========================================================
+   LESSON STEP RENDERING
+   ========================================================= */
+
+function renderLessonStep() {
+
+    const lesson =
+        lessons[currentMission];
+
+    if (!lesson) return;
+
+    const step =
+        lesson.steps[currentStep];
+
+    if (!step) return;
+
+
+    /* -----------------------------------------
+       Basic lesson text
+       ----------------------------------------- */
+
+    if ($("lessonNumber")) {
+
+        $("lessonNumber").textContent =
+            `MISSION ${currentMission}`;
     }
 
-    $("stepStatus").textContent =
-        `✓ Costume changed to ${costume}.`;
-}
+    if ($("lessonStep")) {
+
+        $("lessonStep").textContent =
+            `STEP ${currentStep + 1}`;
+    }
+
+    if ($("lessonTitle")) {
+
+        $("lessonTitle").textContent =
+            step.title;
+    }
+
+    if ($("lessonDescription")) {
+
+        $("lessonDescription").textContent =
+            lesson.description;
+    }
+
+    if ($("actionText")) {
+
+        $("actionText").textContent =
+            step.action;
+    }
 
 
-function showStageBubble(text) {
+    /* -----------------------------------------
+       Why / teacher tip
+       ----------------------------------------- */
 
-    const stage =
-        $("previewStage");
+    if ($("lessonWhy")) {
 
-    if (!stage) return;
+        $("lessonWhy").textContent =
+            getWhyText(currentMission);
+    }
 
-    let bubble =
-        stage.querySelector(".stage-speech");
+    if ($("teacherTip")) {
 
-    if (!bubble) {
+        $("teacherTip").textContent =
+            getTeacherTip(currentMission);
+    }
 
-        bubble =
-            document.createElement("div");
 
-        bubble.className =
-            "stage-speech";
+    /* -----------------------------------------
+       Progress
+       ----------------------------------------- */
 
-        Object.assign(
-            bubble.style,
-            {
-                position: "absolute",
-                zIndex: "20",
-                left: "50%",
-                top: "25%",
-                transform: "translateX(-50%)",
-                padding: "8px 12px",
-                background: "#fff",
-                color: "#111827",
-                borderRadius: "10px",
-                fontSize: "9px",
-                fontWeight: "800",
-                boxShadow: "0 4px 15px rgba(0,0,0,.2)"
-            }
+    const total =
+        lesson.steps.length;
+
+    const percent =
+        ((currentStep) / total) * 100;
+
+    if ($("stepProgressBar")) {
+
+        $("stepProgressBar").style.width =
+            `${percent}%`;
+    }
+
+
+    /* -----------------------------------------
+       RESET VISUAL GUIDANCE
+       ----------------------------------------- */
+
+    clearHighlights();
+
+
+    /*
+       VERY IMPORTANT:
+
+       renderLessonStep NEVER performs the
+       student's action.
+
+       It only tells/highlights what to do.
+    */
+
+
+    if (step.target) {
+
+        highlightTarget(
+            step.target
         );
-
-        stage.appendChild(bubble);
     }
 
-    bubble.textContent =
-        text;
+
+    if (step.tab) {
+
+        highlightEditorTab(
+            step.tab
+        );
+    }
+
+
+    if (step.category) {
+
+        highlightCategory(
+            step.category
+        );
+    }
+
+
+    if (step.block) {
+
+        /*
+           Only highlight the block if the
+           correct category is already open.
+        */
+
+        if (
+            selectedCategory ===
+            step.category &&
+            currentEditorTab === "code"
+        ) {
+
+            highlightBlockOnly(
+                step.block
+            );
+        }
+    }
+
+
+    if (step.assetName) {
+
+        /*
+           Do not select the asset.
+           Only guide the student toward it.
+        */
+
+        highlightAsset(
+            step.assetName
+        );
+    }
+
+
+    if (step.backdrop) {
+
+        highlightBackdrop(
+            step.backdrop
+        );
+    }
+
+
+    /* -----------------------------------------
+       Step status
+       ----------------------------------------- */
+
+    if ($("stepStatus")) {
+
+        $("stepStatus").textContent =
+            "👉 Complete the step, then press NEXT.";
+    }
+
+
+    /* -----------------------------------------
+       NEXT button
+       ----------------------------------------- */
+
+    const next =
+        $("nextLessonStep");
+
+    if (next) {
+
+        next.disabled = false;
+
+        next.textContent =
+            currentStep === total - 1
+                ? "FINISH ✓"
+                : "NEXT →";
+    }
+}
+
+
+/* =========================================================
+   WHY TEXT
+   ========================================================= */
+
+function getWhyText(mission) {
+
+    const why = {
+
+        1:
+            "Sprites are the characters and objects that make up a Scratch project.",
+
+        2:
+            "Motion blocks control where a sprite moves on the stage.",
+
+        3:
+            "A sprite can have multiple costumes, so its appearance can change.",
+
+        4:
+            "Every sprite can have its own independent scripts.",
+
+        5:
+            "Backdrops create the setting or world of your project.",
+
+        6:
+            "Sounds can make actions and events much more exciting.",
+
+        7:
+            "A real game combines sprites, movement, sensing, variables and decisions."
+    };
+
+    return why[mission] || "";
+}
+
+
+/* =========================================================
+   TEACHER TIP
+   ========================================================= */
+
+function getTeacherTip(mission) {
+
+    const tips = {
+
+        1:
+            "Think of sprites as actors on a stage.",
+
+        2:
+            "Change one number and see what happens.",
+
+        3:
+            "Costumes change appearance, not the sprite itself.",
+
+        4:
+            "Look carefully: SHADOW's script should not be AURA's script.",
+
+        5:
+            "A backdrop belongs to the Stage, not to a sprite.",
+
+        6:
+            "Try different sounds and notice how they change the feeling.",
+
+        7:
+            "Games are built by combining small ideas into one system."
+    };
+
+    return tips[mission] || "";
+}
+
+
+/* =========================================================
+   LESSON NEXT BUTTON
+   ========================================================= */
+
+function setupLessonButton() {
+
+    const button =
+        $("nextLessonStep");
+
+    if (!button) return;
+
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            const step =
+                lessons[currentMission]
+                    ?.steps[currentStep];
+
+            if (!step) return;
+
+
+            /*
+               DO NOT ADVANCE until the student
+               has actually completed the step.
+            */
+
+            const result =
+                verifyLessonStep(step);
+
+
+            if (!result.ok) {
+
+                showStepError(
+                    result.message
+                );
+
+                return;
+            }
+
+
+            /* ----------------------------------
+               Correct!
+               ---------------------------------- */
+
+            showStepSuccess(
+                result.message ||
+                "Excellent! Step complete."
+            );
+
+
+            clearHighlights();
+
+
+            const total =
+                lessons[currentMission]
+                    .steps.length;
+
+
+            if (
+                currentStep <
+                total - 1
+            ) {
+
+                currentStep++;
+
+                lastRunCompleted = false;
+
+                renderLessonStep();
+
+            } else {
+
+                completeMission();
+            }
+
+        }
+    );
+}
+
+
+/* =========================================================
+   VERIFY LESSON STEP
+   ========================================================= */
+
+function verifyLessonStep(step) {
+
+
+    /* -----------------------------------------
+       Sprite selection
+       ----------------------------------------- */
+
+    if (step.target) {
+
+        const required =
+            step.target
+                .replace("sprite-", "");
+
+        if (
+            selectedSprite !==
+            required
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Not yet! Select ${capitalize(required)} first.`
+            };
+        }
+
+        return {
+            ok: true,
+            message:
+                `✓ ${capitalize(required)} selected.`
+        };
+    }
+
+
+    /* -----------------------------------------
+       Editor tab
+       ----------------------------------------- */
+
+    if (step.tab) {
+
+        if (
+            currentEditorTab !==
+            step.tab
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Click the ${capitalize(step.tab)} tab first.`
+            };
+        }
+
+        return {
+            ok: true,
+            message:
+                `✓ ${capitalize(step.tab)} tab opened.`
+        };
+    }
+
+
+    /* -----------------------------------------
+       Backdrop
+       ----------------------------------------- */
+
+    if (step.backdrop) {
+
+        if (
+            selectedBackdrop !==
+            step.backdrop
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Choose the ${capitalize(step.backdrop)} backdrop first.`
+            };
+        }
+
+        return {
+            ok: true,
+            message:
+                `✓ ${capitalize(step.backdrop)} backdrop selected.`
+        };
+    }
+
+
+    /* -----------------------------------------
+       Asset
+       ----------------------------------------- */
+
+    if (step.assetName) {
+
+        if (
+            selectedAsset !==
+            step.assetName
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Click "${step.assetName}" in the asset library first.`
+            };
+        }
+
+        return {
+            ok: true,
+            message:
+                `✓ ${step.assetName} selected.`
+        };
+    }
+
+
+    /* -----------------------------------------
+       Block
+       ----------------------------------------- */
+
+    if (step.block) {
+
+        if (
+            currentEditorTab !==
+            "code"
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    "Open the Code tab first."
+            };
+        }
+
+
+        if (
+            selectedCategory !==
+            step.category
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Open the ${capitalize(step.category)} category first.`
+            };
+        }
+
+
+        const found =
+            workspaceBlocks.some(
+                block =>
+                    block.id ===
+                    step.block
+            );
+
+
+        if (!found) {
+
+            const definition =
+                (
+                    scratchBlocks[
+                        step.category
+                    ] || []
+                ).find(
+                    block =>
+                        block.id ===
+                        step.block
+                );
+
+
+            return {
+                ok: false,
+
+                message:
+                    `Click "${definition?.text || step.block}" to add it.`
+            };
+        }
+
+
+        return {
+            ok: true,
+
+            message:
+                "✓ Correct Scratch block added."
+        };
+    }
+
+
+    /* -----------------------------------------
+       Run requirement
+       ----------------------------------------- */
+
+    if (step.run) {
+
+        if (!lastRunCompleted) {
+
+            return {
+                ok: false,
+
+                message:
+                    "Click the green flag and let the project run first."
+            };
+        }
+
+        return {
+            ok: true,
+
+            message:
+                "✓ Project tested successfully."
+        };
+    }
+
+
+    /* -----------------------------------------
+       Final game
+       ----------------------------------------- */
+
+    if (step.runGame) {
+
+        if (!gameRunning) {
+
+            return {
+                ok: false,
+
+                message:
+                    "Launch AURA PLUS with the green flag first."
+            };
+        }
+
+
+        if (
+            auraGame.score <
+            50
+        ) {
+
+            return {
+                ok: false,
+
+                message:
+                    `Collect all 5 Aura Orbs first. Score: ${auraGame.score}/50`
+            };
+        }
+
+
+        return {
+            ok: true,
+
+            message:
+                "🏆 AURA PLUS completed!"
+        };
+    }
+
+
+    return {
+        ok: true,
+        message:
+            "✓ Step complete."
+    };
+}
+
+
+/* =========================================================
+   STEP FEEDBACK
+   ========================================================= */
+
+function showStepError(message) {
+
+    const status =
+        $("stepStatus");
+
+    if (!status) return;
+
+    status.textContent =
+        `⚠️ ${message}`;
+
+    status.classList.remove(
+        "success"
+    );
+
+    status.classList.add(
+        "error"
+    );
 
     setTimeout(
-        hideStageBubble,
+        () => {
+
+            status.classList.remove(
+                "error"
+            );
+
+        },
         1800
     );
 }
 
 
-function hideStageBubble() {
+function showStepSuccess(message) {
 
-    const bubble =
-        $("previewStage")
-            ?.querySelector(".stage-speech");
+    const status =
+        $("stepStatus");
 
-    bubble?.remove();
-}
+    if (!status) return;
 
+    status.textContent =
+        message;
 
-function pulseStage() {
-
-    const stage =
-        $("previewStage");
-
-    if (!stage) return;
-
-    stage.animate(
-        [
-            { transform: "scale(1)" },
-            { transform: "scale(1.025)" },
-            { transform: "scale(1)" }
-        ],
-        {
-            duration: 350
-        }
+    status.classList.remove(
+        "error"
     );
-}
 
-
-/* =========================================================
-   SIMPLE SOUND ENGINE
-   ========================================================= */
-
-function playSound(name) {
-
-    try {
-
-        const AudioContext =
-            window.AudioContext ||
-            window.webkitAudioContext;
-
-        if (!AudioContext) return;
-
-        const ctx =
-            new AudioContext();
-
-        const oscillator =
-            ctx.createOscillator();
-
-        const gain =
-            ctx.createGain();
-
-        const frequencies = {
-            Pop: 650,
-            Collect: 880,
-            Magic: 520,
-            Win: 1040,
-            Meow: 500,
-            Boom: 120,
-            Buzz: 180
-        };
-
-        oscillator.frequency.value =
-            frequencies[name] || 600;
-
-        oscillator.type =
-            name === "Boom"
-                ? "sawtooth"
-                : "sine";
-
-        gain.gain.setValueAtTime(
-            .0001,
-            ctx.currentTime
-        );
-
-        gain.gain.exponentialRampToValueAtTime(
-            .12,
-            ctx.currentTime + .01
-        );
-
-        gain.gain.exponentialRampToValueAtTime(
-            .0001,
-            ctx.currentTime + .18
-        );
-
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-
-        oscillator.start();
-
-        oscillator.stop(
-            ctx.currentTime + .2
-        );
-
-    } catch (error) {
-
-        console.log(
-            "Sound unavailable:",
-            error
-        );
-    }
+    status.classList.add(
+        "success"
+    );
 }
 
 
@@ -2788,195 +2566,1274 @@ function completeMission() {
         );
     }
 
+
+    const progress =
+        $("stepProgressBar");
+
+    if (progress) {
+
+        progress.style.width =
+            "100%";
+    }
+
+
+    if ($("stepStatus")) {
+
+        $("stepStatus").textContent =
+            `🏆 MISSION ${currentMission} COMPLETE!`;
+    }
+
+
+    const next =
+        $("nextLessonStep");
+
+    if (next) {
+
+        next.textContent =
+            "MISSION COMPLETE ✓";
+    }
+
+
+    clearHighlights();
+
     updateMissionProgress();
-
-    $("stepStatus").textContent =
-        "🏆 Mission complete!";
-
-    setTimeout(() => {
-
-        showScreen("tutorialScreen");
-
-    }, 700);
 }
 
 
+/* =========================================================
+   MISSION PROGRESS
+   ========================================================= */
+
 function updateMissionProgress() {
 
-    $$(".mission-card").forEach(card => {
+    $$(".mission-card")
+        .forEach(card => {
 
-        const mission =
-            Number(card.dataset.mission);
+            const number =
+                Number(
+                    card.dataset.mission
+                );
 
-        card.classList.toggle(
-            "completed",
-            completedMissions.includes(mission)
-        );
+            card.classList.toggle(
+                "completed",
+                completedMissions.includes(
+                    number
+                )
+            );
 
-    });
+        });
+}
 
-    const completed =
-        completedMissions.length;
 
-    if ($("tutorialAura")) {
+/* =========================================================
+   BLOCK HIGHLIGHT FIX
+   ========================================================= */
 
-        $("tutorialAura").textContent =
-            `${completed} / 7`;
+function highlightBlock(id) {
+
+    /*
+       Older code may call highlightBlock().
+       Keep it safe, but NEVER change category
+       automatically.
+    */
+
+    if (
+        selectedCategory !==
+        "motion"
+    ) {
+
+        /* intentionally do nothing */
     }
 
-    if ($("auraProgress")) {
+    highlightBlockOnly(id);
+}
 
-        $("auraProgress").style.width =
-            `${(completed / 7) * 100}%`;
+
+/* =========================================================
+   RUN CURRENT WORKSPACE
+   ========================================================= */
+
+function runWorkspace() {
+
+    if (!selectedSprite) {
+
+        showStepError(
+            "Select a sprite first."
+        );
+
+        return;
+    }
+
+
+    saveCurrentSpriteScript();
+
+    lessonRunning = true;
+
+    lastRunCompleted = false;
+
+
+    const blocks =
+        workspaceBlocks.slice();
+
+
+    /*
+       Simple Scratch-like execution.
+       This does not fake completion:
+       it actually processes the blocks.
+    */
+
+    let index = 0;
+
+
+    function executeNext() {
+
+        if (
+            index >=
+            blocks.length
+        ) {
+
+            lessonRunning = false;
+
+            lastRunCompleted = true;
+
+            $("stepStatus").textContent =
+                "▶️ Script finished running.";
+
+            return;
+        }
+
+
+        const block =
+            blocks[index];
+
+
+        executeBlock(
+            block
+        );
+
+
+        index++;
+
+
+        lessonTimer =
+            setTimeout(
+                executeNext,
+                350
+            );
+    }
+
+
+    executeNext();
+}
+
+
+/* =========================================================
+   EXECUTE SCRATCH-LIKE BLOCK
+   ========================================================= */
+
+function executeBlock(block) {
+
+    if (!block) return;
+
+
+    const text =
+        block.text.toLowerCase();
+
+
+    /* -----------------------------------------
+       MOVE
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "move"
+    ) {
+
+        movePreviewSprite(
+            10,
+            0
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       CHANGE X
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "changex"
+    ) {
+
+        movePreviewSprite(
+            10,
+            0
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       CHANGE Y
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "changey"
+    ) {
+
+        movePreviewSprite(
+            0,
+            10
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       TURN
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "turn"
+    ) {
+
+        const player =
+            $("previewPlayer");
+
+        if (player) {
+
+            const current =
+                Number(
+                    player.dataset.rotation ||
+                    0
+                );
+
+            player.dataset.rotation =
+                current + 15;
+
+            player.style.transform =
+                `rotate(${current + 15}deg)`;
+        }
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       SAY
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "say"
+    ) {
+
+        showPreviewMessage(
+            "Hello!"
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       NEXT COSTUME
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "nextcostume"
+    ) {
+
+        cyclePreviewCostume();
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       SOUND
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "soundstart" ||
+        block.id ===
+        "soundwait"
+    ) {
+
+        playSound(
+            "Meow"
+        );
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       SCORE
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "changevar"
+    ) {
+
+        auraGame.score += 10;
+
+        updateGameHUD();
+
+        return;
+    }
+
+
+    /* -----------------------------------------
+       SET SCORE
+       ----------------------------------------- */
+
+    if (
+        block.id ===
+        "setvar"
+    ) {
+
+        auraGame.score = 0;
+
+        updateGameHUD();
+
+        return;
     }
 }
 
 
 /* =========================================================
-   ACTUAL AURA PLUS GAME
+   PREVIEW MOVEMENT
    ========================================================= */
 
-function launchAuraPlusFromLesson() {
+function movePreviewSprite(
+    dx,
+    dy
+) {
 
-    stopLessonPreview();
+    const player =
+        $("previewPlayer");
 
-    startGame();
+    if (!player) return;
 
-    showScreen("gameScreen");
 
-    $("gameObjective").textContent =
-        "COLLECT 5 AURA ORBS → REACH THE PORTAL";
+    let x =
+        Number(
+            player.dataset.x || 50
+        );
 
-    $("stepStatus").textContent =
-        "AURA PLUS launched!";
+    let y =
+        Number(
+            player.dataset.y || 50
+        );
+
+
+    x += dx;
+
+    y += dy;
+
+
+    x =
+        Math.max(
+            5,
+            Math.min(
+                95,
+                x
+            )
+        );
+
+    y =
+        Math.max(
+            5,
+            Math.min(
+                95,
+                y
+            )
+        );
+
+
+    player.dataset.x =
+        x;
+
+    player.dataset.y =
+        y;
+
+
+    player.style.left =
+        `${x}%`;
+
+    player.style.top =
+        `${y}%`;
 }
 
 
-function startGame() {
+/* =========================================================
+   PREVIEW COSTUMES
+   ========================================================= */
 
-    stopGame();
+function updateStageCostume(
+    costume
+) {
 
-    gameRunning = true;
-
-    auraGame = {
-        x: 12,
-        y: 50,
-        score: 0,
-        lives: 3,
-        collected: 0,
-        running: true,
-        shadowX: 72,
-        shadowY: 50
-    };
-
-    updateGameHUD();
-    resetGameObjects();
+    selectedAsset =
+        costume;
 
     const player =
-        $("player");
+        $("previewPlayer");
+
+    if (!player) return;
+
+
+    player.dataset.costume =
+        costume;
+
+
+    /*
+       Visual costume changes without
+       automatically choosing the costume.
+    */
+
+    if (
+        costume
+            .toLowerCase()
+            .includes("glow")
+    ) {
+
+        player.classList.add(
+            "glowing"
+        );
+
+    } else {
+
+        player.classList.remove(
+            "glowing"
+        );
+    }
+}
+
+
+function cyclePreviewCostume() {
+
+    const data =
+        spriteAssets[
+            selectedSprite ||
+            "aura"
+        ];
+
+
+    const costumes =
+        data?.costumes || [];
+
+
+    if (!costumes.length)
+        return;
+
+
+    let current =
+        playerCostumeIndex();
+
+
+    current =
+        (current + 1) %
+        costumes.length;
+
+
+    updateStageCostume(
+        costumes[current]
+    );
+}
+
+
+function playerCostumeIndex() {
+
+    const player =
+        $("previewPlayer");
+
+    if (!player)
+        return 0;
+
+
+    const current =
+        player.dataset.costume;
+
+
+    const costumes =
+        spriteAssets[
+            selectedSprite ||
+            "aura"
+        ]?.costumes || [];
+
+
+    const index =
+        costumes.indexOf(
+            current
+        );
+
+
+    return index >= 0
+        ? index
+        : 0;
+}
+
+
+/* =========================================================
+   PREVIEW MESSAGE
+   ========================================================= */
+
+function showPreviewMessage(
+    message
+) {
+
+    const player =
+        $("previewPlayer");
+
+    if (!player) return;
+
+
+    let bubble =
+        qs(".preview-speech");
+
+
+    if (!bubble) {
+
+        bubble =
+            document.createElement(
+                "div"
+            );
+
+        bubble.className =
+            "preview-speech";
+
+        player.parentElement
+            ?.appendChild(
+                bubble
+            );
+    }
+
+
+    bubble.textContent =
+        message;
+
+
+    bubble.classList.add(
+        "show"
+    );
+
+
+    setTimeout(
+        () => {
+
+            bubble.classList.remove(
+                "show"
+            );
+
+        },
+        1800
+    );
+}
+
+
+/* =========================================================
+   SOUND
+   ========================================================= */
+
+function playSound(name) {
+
+    /*
+       Browser audio may require a user
+       interaction. We therefore create
+       a tiny oscillator only after a
+       real click.
+    */
+
+    try {
+
+        const AudioContext =
+            window.AudioContext ||
+            window.webkitAudioContext;
+
+        if (!AudioContext)
+            return;
+
+        const context =
+            new AudioContext();
+
+        const oscillator =
+            context.createOscillator();
+
+        const gain =
+            context.createGain();
+
+
+        const frequencies = {
+
+            Meow: 660,
+
+            Pop: 880,
+
+            Collect: 1040,
+
+            Boom: 130,
+
+            Buzz: 220,
+
+            Magic: 740,
+
+            Win: 1200
+        };
+
+
+        oscillator.frequency.value =
+            frequencies[name] ||
+            600;
+
+
+        oscillator.type =
+            name === "Boom"
+                ? "sawtooth"
+                : "sine";
+
+
+        gain.gain.setValueAtTime(
+            0.001,
+            context.currentTime
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.15,
+            context.currentTime + 0.02
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            context.currentTime + 0.25
+        );
+
+
+        oscillator.connect(
+            gain
+        );
+
+        gain.connect(
+            context.destination
+        );
+
+
+        oscillator.start();
+
+        oscillator.stop(
+            context.currentTime +
+            0.25
+        );
+
+    } catch (error) {
+
+        console.log(
+            "Sound unavailable:",
+            error
+        );
+    }
+}
+
+
+/* =========================================================
+   CAPITALIZE
+   ========================================================= */
+
+function capitalize(value) {
+
+    if (!value)
+        return "";
+
+    return value.charAt(0)
+        .toUpperCase() +
+        value.slice(1);
+}
+
+
+/* =========================================================
+   UNDO
+   ========================================================= */
+
+function undoWorkspace() {
+
+    if (!selectedSprite)
+        return;
+
+
+    if (!undoStack.length)
+        return;
+
+
+    redoStack.push(
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        )
+    );
+
+
+    workspaceBlocks =
+        undoStack.pop();
+
+
+    saveCurrentSpriteScript();
+
+    renderWorkspace();
+}
+
+
+function redoWorkspace() {
+
+    if (!selectedSprite)
+        return;
+
+
+    if (!redoStack.length)
+        return;
+
+
+    undoStack.push(
+        JSON.parse(
+            JSON.stringify(
+                workspaceBlocks
+            )
+        )
+    );
+
+
+    workspaceBlocks =
+        redoStack.pop();
+
+
+    saveCurrentSpriteScript();
+
+    renderWorkspace();
+}
+
+
+/* =========================================================
+   TOOLBAR
+   ========================================================= */
+
+function setupToolbar() {
+
+    const undo =
+        qs(
+            '[title*="Undo"]'
+        );
+
+    const redo =
+        qs(
+            '[title*="Redo"]'
+        );
+
+
+    undo?.addEventListener(
+        "click",
+        undoWorkspace
+    );
+
+    redo?.addEventListener(
+        "click",
+        redoWorkspace
+    );
+
+
+    $("lessonFlag")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                runWorkspace();
+            }
+        );
+
+
+    $("lessonStop")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopWorkspace();
+            }
+        );
+
+
+    $("stageFlag")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                runWorkspace();
+            }
+        );
+
+
+    $("stageStop")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopWorkspace();
+            }
+        );
+}
+
+
+/* =========================================================
+   STOP WORKSPACE
+   ========================================================= */
+
+function stopWorkspace() {
+
+    if (lessonTimer) {
+
+        clearTimeout(
+            lessonTimer
+        );
+
+        lessonTimer = null;
+    }
+
+    lessonRunning = false;
+
+    $("stepStatus").textContent =
+        "⏹ Script stopped.";
+}
+
+
+/* =========================================================
+   STAGE SPRITE UPDATE
+   ========================================================= */
+
+function updateStageSprite() {
+
+    const player =
+        $("previewPlayer");
+
+    if (!player) return;
+
+
+    player.dataset.sprite =
+        selectedSprite || "";
+
+
+    const names = {
+
+        aura: "A",
+
+        shadow: "S",
+
+        orb: "✦",
+
+        portal: "◎",
+
+        star: "★"
+    };
+
+
+    player.textContent =
+        names[selectedSprite] ||
+        "?";
+}
+
+
+/* =========================================================
+   INIT
+   ========================================================= */
+
+function initializeAuraPlus() {
+
+    setupSprites();
+
+    setupCategories();
+
+    setupEditorTabs();
+
+    setupAssetTabs();
+
+    setupBackdrops();
+
+    setupLessonButton();
+
+    setupToolbar();
+
+    renderPalette();
+
+    renderWorkspace();
+
+    renderAssets();
+
+    renderBackdrops();
+
+    updateMissionProgress();
+
+
+    /*
+       IMPORTANT:
+       No sprite is automatically selected.
+       No category is automatically selected
+       for a lesson.
+       No backdrop is automatically selected.
+       No costume/sound is automatically
+       selected.
+    */
+
+    selectedSprite = null;
+
+    updateSpriteSelection();
+
+    renderWorkspace();
+}
+
+
+/* =========================================================
+   DOM READY
+   ========================================================= */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeAuraPlus
+    );
+
+} else {
+
+    initializeAuraPlus();
+}
+
+
+/* =========================================================
+   PART 2 ENDS HERE
+   ========================================================= */
+/* =========================================================
+   AURA PLUS — PART 3 / 3
+   GAME ENGINE + NAVIGATION + TOUCH + FINAL POLISH
+   ========================================================= */
+
+
+/* =========================================================
+   AURA PLUS GAME
+   ========================================================= */
+
+const gameWorld =
+    () => $("gameWorld");
+
+
+const playerElement =
+    () => $("player");
+
+
+const shadowElement =
+    () => $("shadow");
+
+
+const portalElement =
+    () => $("portal");
+
+
+/* =========================================================
+   RESET GAME
+   ========================================================= */
+
+function resetGameObjects() {
+
+    const world =
+        gameWorld();
+
+    if (!world) return;
+
+
+    /*
+       Remove old generated game objects.
+    */
+
+    world
+        .querySelectorAll(
+            ".aura-orb,.game-portal,.game-shadow"
+        )
+        .forEach(
+            element =>
+                element.remove()
+        );
+
+
+    /*
+       Create 5 Aura Orbs.
+    */
+
+    const orbPositions = [
+
+        { x: 20, y: 20 },
+
+        { x: 48, y: 22 },
+
+        { x: 75, y: 30 },
+
+        { x: 32, y: 68 },
+
+        { x: 70, y: 72 }
+    ];
+
+
+    orbPositions.forEach(
+        (position,index) => {
+
+            const orb =
+                document.createElement("div");
+
+            orb.className =
+                "aura-orb";
+
+            orb.dataset.index =
+                index;
+
+            orb.dataset.collected =
+                "false";
+
+            orb.style.left =
+                `${position.x}%`;
+
+            orb.style.top =
+                `${position.y}%`;
+
+            orb.innerHTML =
+                "✦";
+
+            world.appendChild(
+                orb
+            );
+        }
+    );
+
+
+    /*
+       Create portal.
+    */
+
+    const portal =
+        document.createElement("div");
+
+    portal.id =
+        "portal";
+
+    portal.className =
+        "game-portal";
+
+    portal.style.left =
+        "88%";
+
+    portal.style.top =
+        "50%";
+
+    portal.innerHTML =
+        "◎";
+
+    portal.style.opacity =
+        "0.25";
+
+    world.appendChild(
+        portal
+    );
+
+
+    /*
+       Create Shadow.
+    */
+
+    const shadow =
+        document.createElement("div");
+
+    shadow.id =
+        "shadow";
+
+    shadow.className =
+        "game-shadow";
+
+    shadow.style.left =
+        "72%";
+
+    shadow.style.top =
+        "50%";
+
+    shadow.innerHTML =
+        "☠";
+
+    world.appendChild(
+        shadow
+    );
+
+
+    /*
+       Reset player.
+    */
+
+    const player =
+        playerElement();
 
     if (player) {
 
         player.style.left =
-            `${auraGame.x}%`;
+            "10%";
 
         player.style.top =
-            `${auraGame.y}%`;
+            "50%";
+
+        player.dataset.x =
+            "10";
+
+        player.dataset.y =
+            "50";
     }
 
-    const message =
-        $("gameMessage");
 
-    message?.classList.add("hidden");
+    auraGame = {
 
-    requestAnimationFrame(gameLoop);
+        x: 10,
+
+        y: 50,
+
+        score: 0,
+
+        lives: 3,
+
+        collected: 0,
+
+        shadowX: 72,
+
+        shadowY: 50
+    };
+
+
+    updateGameHUD();
+
+    gameRunning = false;
 }
 
 
-function stopGame() {
+/* =========================================================
+   GAME HUD
+   ========================================================= */
 
-    gameRunning = false;
-    auraGame.running = false;
+function updateGameHUD() {
+
+    const score =
+        $("gameScore");
+
+    const lives =
+        $("gameLives");
+
+    const collected =
+        $("gameCollected");
+
+
+    if (score) {
+
+        score.textContent =
+            auraGame.score;
+    }
+
+
+    if (lives) {
+
+        lives.textContent =
+            auraGame.lives;
+    }
+
+
+    if (collected) {
+
+        collected.textContent =
+            `${auraGame.collected}/5`;
+    }
+
+
+    /*
+       Support alternative IDs too.
+    */
+
+    qs("#scoreValue") &&
+        (qs("#scoreValue").textContent =
+            auraGame.score);
+
+    qs("#livesValue") &&
+        (qs("#livesValue").textContent =
+            auraGame.lives);
+
+    qs("#orbCount") &&
+        (qs("#orbCount").textContent =
+            `${auraGame.collected}/5`);
+}
+
+
+/* =========================================================
+   START GAME
+   ========================================================= */
+
+function startAuraPlusGame() {
+
+    resetGameObjects();
+
+    gameRunning = true;
+
+    lastHit = 0;
+
+
+    const world =
+        gameWorld();
+
+    if (!world) return;
+
+
+    /*
+       Start animation loop.
+    */
 
     if (gameAnimation) {
 
         cancelAnimationFrame(
             gameAnimation
         );
-
-        gameAnimation = null;
     }
+
+
+    gameLoop();
 }
 
 
-function resetGameObjects() {
-
-    const positions = [
-        [18, 25],
-        [38, 72],
-        [57, 28],
-        [72, 68],
-        [84, 34]
-    ];
-
-    $$(".aura-orb").forEach((orb, index) => {
-
-        orb.classList.remove("collected");
-
-        orb.style.display = "block";
-
-        orb.style.left =
-            `${positions[index][0]}%`;
-
-        orb.style.top =
-            `${positions[index][1]}%`;
-    });
-
-    const portal =
-        $("portal");
-
-    if (portal) {
-
-        portal.style.opacity =
-            ".35";
-
-        portal.style.borderColor =
-            "#475569";
-    }
-
-    const shadow =
-        $("shadow");
-
-    if (shadow) {
-
-        shadow.style.left = "72%";
-        shadow.style.top = "50%";
-    }
-}
-
-
-function updateGameHUD() {
-
-    if ($("auraScore"))
-        $("auraScore").textContent =
-            auraGame.score;
-
-    if ($("lives"))
-        $("lives").textContent =
-            auraGame.lives;
-}
-
+/* =========================================================
+   GAME LOOP
+   ========================================================= */
 
 function gameLoop() {
 
     if (!gameRunning)
         return;
 
+
     moveShadow();
 
     checkOrbCollisions();
+
     checkShadowCollision();
-    checkPortal();
+
+    checkPortalCollision();
+
 
     gameAnimation =
         requestAnimationFrame(
@@ -2986,564 +3843,991 @@ function gameLoop() {
 
 
 /* =========================================================
-   GAME — SHADOW
+   MOVE PLAYER
    ========================================================= */
 
-function moveShadow() {
-
-    const dx =
-        auraGame.x -
-        auraGame.shadowX;
-
-    const dy =
-        auraGame.y -
-        auraGame.shadowY;
-
-    const distance =
-        Math.sqrt(
-            dx * dx +
-            dy * dy
-        );
-
-    if (distance > 2) {
-
-        auraGame.shadowX +=
-            (dx / distance) * .06;
-
-        auraGame.shadowY +=
-            (dy / distance) * .06;
-    }
-
-    const shadow =
-        $("shadow");
-
-    if (shadow) {
-
-        shadow.style.left =
-            `${auraGame.shadowX}%`;
-
-        shadow.style.top =
-            `${auraGame.shadowY}%`;
-    }
-}
-
-
-/* =========================================================
-   GAME — ORBS
-   ========================================================= */
-
-function checkOrbCollisions() {
-
-    const player =
-        $("player");
-
-    if (!player) return;
-
-    const playerRect =
-        player.getBoundingClientRect();
-
-    $$(".aura-orb").forEach(orb => {
-
-        if (
-            orb.style.display === "none"
-        ) return;
-
-        const orbRect =
-            orb.getBoundingClientRect();
-
-        if (
-            rectanglesTouch(
-                playerRect,
-                orbRect
-            )
-        ) {
-
-            collectOrb(orb);
-        }
-    });
-}
-
-
-function collectOrb(orb) {
-
-    orb.style.display =
-        "none";
-
-    auraGame.score +=
-        Number(
-            orb.dataset.value || 10
-        );
-
-    auraGame.collected++;
-
-    updateGameHUD();
-
-    playSound("Collect");
-
-    if (
-        auraGame.collected >= 5
-    ) {
-
-        unlockPortal();
-
-    } else {
-
-        $("gameObjective").textContent =
-            `COLLECT ${5 - auraGame.collected} MORE ORB${5 - auraGame.collected === 1 ? "" : "S"}`;
-    }
-}
-
-
-/* =========================================================
-   GAME — PORTAL
-   ========================================================= */
-
-function unlockPortal() {
-
-    const portal =
-        $("portal");
-
-    if (!portal) return;
-
-    portal.style.opacity =
-        "1";
-
-    portal.style.borderColor =
-        "#a78bfa";
-
-    portal.style.boxShadow =
-        "0 0 35px rgba(167,139,250,.8)";
-
-    $("gameObjective").textContent =
-        "PORTAL UNLOCKED → REACH IT!";
-
-    playSound("Magic");
-}
-
-
-/* =========================================================
-   GAME — SHADOW COLLISION
-   ========================================================= */
-
-let lastHit = 0;
-
-function checkShadowCollision() {
-
-    const player =
-        $("player");
-
-    const shadow =
-        $("shadow");
-
-    if (!player || !shadow)
-        return;
-
-    const p =
-        player.getBoundingClientRect();
-
-    const s =
-        shadow.getBoundingClientRect();
-
-    if (
-        rectanglesTouch(p, s)
-    ) {
-
-        const now =
-            Date.now();
-
-        if (
-            now - lastHit < 1500
-        ) return;
-
-        lastHit = now;
-
-        auraGame.lives--;
-
-        updateGameHUD();
-
-        playSound("Boom");
-
-        auraGame.x = 12;
-        auraGame.y = 50;
-
-        player.style.left =
-            `${auraGame.x}%`;
-
-        player.style.top =
-            `${auraGame.y}%`;
-
-        if (
-            auraGame.lives <= 0
-        ) {
-
-            gameOver();
-        }
-    }
-}
-
-
-/* =========================================================
-   GAME — PORTAL COLLISION
-   ========================================================= */
-
-function checkPortal() {
-
-    if (
-        auraGame.collected < 5
-    ) return;
-
-    const player =
-        $("player");
-
-    const portal =
-        $("portal");
-
-    if (!player || !portal)
-        return;
-
-    if (
-        rectanglesTouch(
-            player.getBoundingClientRect(),
-            portal.getBoundingClientRect()
-        )
-    ) {
-
-        winGame();
-    }
-}
-
-
-function rectanglesTouch(a, b) {
-
-    return !(
-        a.right < b.left ||
-        a.left > b.right ||
-        a.bottom < b.top ||
-        a.top > b.bottom
-    );
-}
-
-
-/* =========================================================
-   GAME — WIN / LOSE
-   ========================================================= */
-
-function winGame() {
+function moveGamePlayer(
+    dx,
+    dy
+) {
 
     if (!gameRunning)
         return;
 
-    gameRunning = false;
 
-    if (gameAnimation)
-        cancelAnimationFrame(
-            gameAnimation
+    auraGame.x += dx;
+
+    auraGame.y += dy;
+
+
+    /*
+       Keep player inside game area.
+    */
+
+    auraGame.x =
+        Math.max(
+            4,
+            Math.min(
+                94,
+                auraGame.x
+            )
         );
 
-    playSound("Win");
 
-    const message =
-        $("gameMessage");
+    auraGame.y =
+        Math.max(
+            8,
+            Math.min(
+                88,
+                auraGame.y
+            )
+        );
 
-    message.innerHTML = `
-        <div>
-            <div style="font-size:14px;color:#a78bfa;letter-spacing:3px;">
-                AURA PLUS
-            </div>
 
-            <div style="font-size:42px;margin:10px 0;">
-                🏆 YOU WIN!
-            </div>
+    const player =
+        playerElement();
 
-            <div style="font-size:15px;color:#cbd5e1;">
-                50 AURA collected • Portal reached
-            </div>
+    if (!player) return;
 
-            <button
-                onclick="finishGame()"
-                style="
-                    margin-top:22px;
-                    padding:12px 22px;
-                    border:0;
-                    border-radius:8px;
-                    background:#7c3aed;
-                    color:white;
-                    font-weight:900;
-                    cursor:pointer;
-                ">
-                CONTINUE →
-            </button>
-        </div>
-    `;
 
-    message.classList.remove("hidden");
+    player.style.left =
+        `${auraGame.x}%`;
+
+    player.style.top =
+        `${auraGame.y}%`;
+
+
+    player.dataset.x =
+        auraGame.x;
+
+    player.dataset.y =
+        auraGame.y;
 }
-
-
-function gameOver() {
-
-    gameRunning = false;
-
-    const message =
-        $("gameMessage");
-
-    message.innerHTML = `
-        <div>
-
-            <div style="font-size:42px;">
-                💥 GAME OVER
-            </div>
-
-            <div style="font-size:15px;color:#cbd5e1;margin-top:10px;">
-                Don't worry — every game can be improved.
-            </div>
-
-            <button
-                onclick="startGame()"
-                style="
-                    margin-top:22px;
-                    padding:12px 22px;
-                    border:0;
-                    border-radius:8px;
-                    background:#4c97ff;
-                    color:white;
-                    font-weight:900;
-                    cursor:pointer;
-                ">
-                TRY AGAIN
-            </button>
-
-        </div>
-    `;
-
-    message.classList.remove("hidden");
-}
-
-
-/* =========================================================
-   GLOBAL GAME FINISH
-   ========================================================= */
-
-window.finishGame = function() {
-
-    stopGame();
-
-    completedMissions =
-        completedMissions.includes(7)
-            ? completedMissions
-            : [...completedMissions, 7];
-
-    localStorage.setItem(
-        "auraPlusMissions",
-        JSON.stringify(
-            completedMissions
-        )
-    );
-
-    updateMissionProgress();
-
-    showScreen("finalScreen");
-};
 
 
 /* =========================================================
    KEYBOARD CONTROLS
    ========================================================= */
 
-document.addEventListener(
-    "keydown",
-    event => {
+function setupGameControls() {
 
-        if (
-            !gameRunning
-        ) return;
+    document.addEventListener(
+        "keydown",
+        event => {
 
-        const allowed =
-            [
-                "ArrowLeft",
-                "ArrowRight",
-                "ArrowUp",
-                "ArrowDown",
-                "w",
-                "a",
-                "s",
-                "d",
-                "W",
-                "A",
-                "S",
-                "D"
-            ];
-
-        if (
-            !allowed.includes(
-                event.key
-            )
-        ) return;
-
-        event.preventDefault();
-
-        const speed = 1.2;
-
-        switch (event.key) {
-
-            case "ArrowLeft":
-            case "a":
-            case "A":
-                auraGame.x -= speed;
-                break;
-
-            case "ArrowRight":
-            case "d":
-            case "D":
-                auraGame.x += speed;
-                break;
-
-            case "ArrowUp":
-            case "w":
-            case "W":
-                auraGame.y -= speed;
-                break;
-
-            case "ArrowDown":
-            case "s":
-            case "S":
-                auraGame.y += speed;
-                break;
-        }
-
-        auraGame.x =
-            clamp(
-                auraGame.x,
-                4,
-                96
-            );
-
-        auraGame.y =
-            clamp(
-                auraGame.y,
-                10,
-                90
-            );
-
-        const player =
-            $("player");
-
-        if (player) {
-
-            player.style.left =
-                `${auraGame.x}%`;
-
-            player.style.top =
-                `${auraGame.y}%`;
-        }
-    }
-);
+            if (!gameRunning)
+                return;
 
 
-/* =========================================================
-   TOUCH / SMARTBOARD GAME CONTROL
-   ========================================================= */
+            let dx = 0;
 
-$("gameWorld")?.addEventListener(
-    "pointermove",
-    event => {
+            let dy = 0;
 
-        if (!gameRunning)
-            return;
 
-        /*
-           Touch / pointer movement is especially useful
-           on a smartboard.
-        */
+            switch (
+                event.key.toLowerCase()
+            ) {
 
-        if (
-            event.pointerType === "touch" ||
-            event.buttons
-        ) {
+                case "arrowleft":
+                case "a":
+                    dx = -2;
+                    break;
 
-            const world =
-                $("gameWorld");
+                case "arrowright":
+                case "d":
+                    dx = 2;
+                    break;
 
-            const rect =
-                world.getBoundingClientRect();
+                case "arrowup":
+                case "w":
+                    dy = -2;
+                    break;
 
-            auraGame.x =
-                clamp(
-                    (
-                        (event.clientX - rect.left)
-                        / rect.width
-                    ) * 100,
-                    4,
-                    96
-                );
+                case "arrowdown":
+                case "s":
+                    dy = 2;
+                    break;
 
-            auraGame.y =
-                clamp(
-                    (
-                        (event.clientY - rect.top)
-                        / rect.height
-                    ) * 100,
-                    10,
-                    90
-                );
-
-            const player =
-                $("player");
-
-            if (player) {
-
-                player.style.left =
-                    `${auraGame.x}%`;
-
-                player.style.top =
-                    `${auraGame.y}%`;
+                default:
+                    return;
             }
+
+
+            event.preventDefault();
+
+            moveGamePlayer(
+                dx,
+                dy
+            );
         }
-    }
-);
+    );
 
 
-/* =========================================================
-   UTILITY
-   ========================================================= */
+    /*
+       Touch / smartboard controls.
+    */
 
-function capitalize(value) {
+    $$(".game-control")
+        .forEach(button => {
 
-    if (!value) return "";
+            const direction =
+                button.dataset.direction;
 
-    return value.charAt(0).toUpperCase() +
-        value.slice(1);
+
+            const move =
+                () => {
+
+                    const movement = {
+
+                        left: [-3, 0],
+
+                        right: [3, 0],
+
+                        up: [0, -3],
+
+                        down: [0, 3]
+                    };
+
+
+                    const [dx,dy] =
+                        movement[
+                            direction
+                        ] || [0,0];
+
+
+                    moveGamePlayer(
+                        dx,
+                        dy
+                    );
+                };
+
+
+            button.addEventListener(
+                "pointerdown",
+                event => {
+
+                    event.preventDefault();
+
+                    move();
+                }
+            );
+
+        });
 }
 
 
 /* =========================================================
-   DEBUG / RESET
+   SHADOW AI
    ========================================================= */
 
-window.resetAuraProgress = function() {
+function moveShadow() {
 
-    localStorage.removeItem(
-        "auraPlusMissions"
-    );
+    const shadow =
+        shadowElement();
 
-    completedMissions = [];
+    if (!shadow)
+        return;
 
-    updateMissionProgress();
 
-    alert(
-        "AURA PLUS progress reset."
-    );
-};
+    /*
+       Simple chasing AI.
+    */
+
+    const differenceX =
+        auraGame.x -
+        auraGame.shadowX;
+
+
+    const differenceY =
+        auraGame.y -
+        auraGame.shadowY;
+
+
+    const distance =
+        Math.sqrt(
+            differenceX * differenceX +
+            differenceY * differenceY
+        );
+
+
+    /*
+       Shadow becomes more dangerous
+       as the game progresses.
+    */
+
+    const speed =
+        auraGame.collected >= 3
+            ? 0.18
+            : 0.10;
+
+
+    if (distance > 0) {
+
+        auraGame.shadowX +=
+            (differenceX / distance) *
+            speed;
+
+        auraGame.shadowY +=
+            (differenceY / distance) *
+            speed;
+    }
+
+
+    shadow.style.left =
+        `${auraGame.shadowX}%`;
+
+    shadow.style.top =
+        `${auraGame.shadowY}%`;
+}
 
 
 /* =========================================================
-   INITIAL VISUAL STATE
+   ORB COLLISION
    ========================================================= */
 
-setTimeout(() => {
+function checkOrbCollisions() {
 
-    updateStageSprite();
+    const orbs =
+        $$(".aura-orb");
+
+
+    orbs.forEach(
+        orb => {
+
+            if (
+                orb.dataset.collected ===
+                "true"
+            )
+                return;
+
+
+            const x =
+                parseFloat(
+                    orb.style.left
+                );
+
+            const y =
+                parseFloat(
+                    orb.style.top
+                );
+
+
+            const distance =
+                Math.sqrt(
+                    Math.pow(
+                        auraGame.x - x,
+                        2
+                    ) +
+                    Math.pow(
+                        auraGame.y - y,
+                        2
+                    )
+                );
+
+
+            if (
+                distance <
+                7
+            ) {
+
+                collectOrb(
+                    orb
+                );
+            }
+        }
+    );
+}
+
+
+/* =========================================================
+   COLLECT ORB
+   ========================================================= */
+
+function collectOrb(orb) {
+
+    if (
+        orb.dataset.collected ===
+        "true"
+    )
+        return;
+
+
+    orb.dataset.collected =
+        "true";
+
+
+    orb.classList.add(
+        "collected"
+    );
+
+
+    auraGame.collected++;
+
+    auraGame.score += 10;
+
+
+    playSound(
+        "Collect"
+    );
+
+
+    updateGameHUD();
+
+
+    /*
+       Unlock portal after all 5.
+    */
+
+    if (
+        auraGame.collected >= 5
+    ) {
+
+        unlockPortal();
+    }
+}
+
+
+/* =========================================================
+   PORTAL UNLOCK
+   ========================================================= */
+
+function unlockPortal() {
+
+    const portal =
+        portalElement();
+
+    if (!portal)
+        return;
+
+
+    portal.classList.add(
+        "unlocked"
+    );
+
+
+    portal.style.opacity =
+        "1";
+
+
+    portal.style.pointerEvents =
+        "auto";
+
+
+    portal.innerHTML =
+        "✦";
+
+
+    showGameMessage(
+        "PORTAL UNLOCKED! ✨"
+    );
+}
+
+
+/* =========================================================
+   SHADOW COLLISION
+   ========================================================= */
+
+function checkShadowCollision() {
+
+    const now =
+        Date.now();
+
+
+    if (
+        now - lastHit <
+        1200
+    )
+        return;
+
+
+    const distance =
+        Math.sqrt(
+            Math.pow(
+                auraGame.x -
+                auraGame.shadowX,
+                2
+            ) +
+            Math.pow(
+                auraGame.y -
+                auraGame.shadowY,
+                2
+            )
+        );
+
+
+    if (
+        distance <
+        7
+    ) {
+
+        lastHit =
+            now;
+
+        loseLife();
+    }
+}
+
+
+/* =========================================================
+   LOSE LIFE
+   ========================================================= */
+
+function loseLife() {
+
+    auraGame.lives--;
+
+    updateGameHUD();
+
+
+    const player =
+        playerElement();
+
+    player?.classList.add(
+        "hit"
+    );
+
+
+    setTimeout(
+        () => {
+
+            player?.classList.remove(
+                "hit"
+            );
+
+        },
+        400
+    );
+
+
+    if (
+        auraGame.lives <= 0
+    ) {
+
+        gameOver();
+
+        return;
+    }
+
+
+    /*
+       Respawn player away from Shadow.
+    */
+
+    auraGame.x =
+        10;
+
+    auraGame.y =
+        50;
+
+
+    moveGamePlayer(
+        0,
+        0
+    );
+
+
+    showGameMessage(
+        `⚡ HIT! ${auraGame.lives} lives left`
+    );
+}
+
+
+/* =========================================================
+   PORTAL COLLISION
+   ========================================================= */
+
+function checkPortalCollision() {
+
+    if (
+        auraGame.collected <
+        5
+    )
+        return;
+
+
+    const distance =
+        Math.sqrt(
+            Math.pow(
+                auraGame.x - 88,
+                2
+            ) +
+            Math.pow(
+                auraGame.y - 50,
+                2
+            )
+        );
+
+
+    if (
+        distance <
+        8
+    ) {
+
+        winAuraPlus();
+    }
+}
+
+
+/* =========================================================
+   WIN
+   ========================================================= */
+
+function winAuraPlus() {
+
+    if (!gameRunning)
+        return;
+
+
+    gameRunning = false;
+
+
+    if (gameAnimation) {
+
+        cancelAnimationFrame(
+            gameAnimation
+        );
+
+        gameAnimation = null;
+    }
+
+
+    playSound(
+        "Win"
+    );
+
+
+    showGameMessage(
+        "🏆 AURA PLUS COMPLETE!"
+    );
+
+
+    /*
+       Mark Mission 7 complete.
+    */
+
+    if (
+        !completedMissions.includes(7)
+    ) {
+
+        completedMissions.push(7);
+
+        localStorage.setItem(
+            "auraPlusMissions",
+            JSON.stringify(
+                completedMissions
+            )
+        );
+    }
+
+
+    lastRunCompleted = true;
+
+    updateMissionProgress();
+
+
+    /*
+       Allow the lesson's final NEXT
+       to finish.
+    */
+
+    setTimeout(
+        () => {
+
+            if (
+                currentMission === 7
+            ) {
+
+                $("stepStatus").textContent =
+                    "🏆 You built and completed AURA PLUS!";
+
+            }
+
+        },
+        500
+    );
+}
+
+
+/* =========================================================
+   GAME OVER
+   ========================================================= */
+
+function gameOver() {
+
+    gameRunning = false;
+
+
+    if (gameAnimation) {
+
+        cancelAnimationFrame(
+            gameAnimation
+        );
+
+        gameAnimation = null;
+    }
+
+
+    showGameMessage(
+        "💥 GAME OVER — Press the flag to retry."
+    );
+}
+
+
+/* =========================================================
+   GAME MESSAGE
+   ========================================================= */
+
+function showGameMessage(
+    message
+) {
+
+    let messageBox =
+        $("gameMessage");
+
+
+    if (!messageBox) {
+
+        const world =
+            gameWorld();
+
+        if (!world)
+            return;
+
+
+        messageBox =
+            document.createElement(
+                "div"
+            );
+
+        messageBox.id =
+            "gameMessage";
+
+        messageBox.className =
+            "game-message";
+
+        world.appendChild(
+            messageBox
+        );
+    }
+
+
+    messageBox.textContent =
+        message;
+
+
+    messageBox.classList.add(
+        "show"
+    );
+
+
+    setTimeout(
+        () => {
+
+            messageBox.classList.remove(
+                "show"
+            );
+
+        },
+        2200
+    );
+}
+
+
+/* =========================================================
+   GAME BUTTON
+   ========================================================= */
+
+function setupGameButtons() {
+
+    const flag =
+        $("gameFlag");
+
+
+    flag?.addEventListener(
+        "click",
+        () => {
+
+            startAuraPlusGame();
+        }
+    );
+
+
+    /*
+       Existing stage green flag
+       should also launch the actual
+       game when Mission 7 is active.
+    */
+
+    $("stageFlag")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                if (
+                    currentMission ===
+                    7
+                ) {
+
+                    startAuraPlusGame();
+
+                } else {
+
+                    runWorkspace();
+                }
+            }
+        );
+
+
+    $("lessonFlag")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                if (
+                    currentMission ===
+                    7 &&
+                    currentStep ===
+                    lessons[7].steps.length - 1
+                ) {
+
+                    startAuraPlusGame();
+
+                } else {
+
+                    runWorkspace();
+                }
+            }
+        );
+}
+
+
+/* =========================================================
+   BACK TO MISSIONS
+   ========================================================= */
+
+function setupNavigation() {
+
+    $("backToMissions")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                stopWorkspace();
+
+                gameRunning =
+                    false;
+
+                if (gameAnimation) {
+
+                    cancelAnimationFrame(
+                        gameAnimation
+                    );
+
+                    gameAnimation =
+                        null;
+                }
+
+                showScreen(
+                    "missionsScreen"
+                );
+
+                updateMissionProgress();
+            }
+        );
+
+
+    /*
+       Reveal button
+    */
+
+    $("revealButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                showScreen(
+                    "missionsScreen"
+                );
+
+                updateMissionProgress();
+            }
+        );
+
+
+    /*
+       Start / enter button.
+    */
+
+    $("startButton")
+        ?.addEventListener(
+            "click",
+            () => {
+
+                showScreen(
+                    "missionsScreen"
+                );
+            }
+        );
+
+
+    /*
+       Mission cards.
+    */
+
+    $$(".mission-card")
+        .forEach(card => {
+
+            card.addEventListener(
+                "click",
+                () => {
+
+                    const mission =
+                        Number(
+                            card.dataset.mission
+                        );
+
+                    if (!mission)
+                        return;
+
+                    openMission(
+                        mission
+                    );
+                }
+            );
+
+        });
+}
+
+
+/* =========================================================
+   GAME INITIALIZATION
+   ========================================================= */
+
+function initializeGame() {
+
+    resetGameObjects();
+
+    setupGameControls();
+
+    setupGameButtons();
+}
+
+
+/* =========================================================
+   FINAL INITIALIZATION
+   ========================================================= */
+
+function finalAuraInitialization() {
+
+    initializeGame();
+
+    setupNavigation();
+
+    updateMissionProgress();
+
+    /*
+       Make sure the lesson starts
+       with no accidental sprite selection.
+    */
+
+    selectedSprite = null;
+
+    updateSpriteSelection();
 
     renderWorkspace();
 
-}, 100);
+
+    /*
+       Default backdrop visual only.
+       It is NOT counted as a student action.
+    */
+
+    selectBackdropVisual(
+        selectedBackdrop
+    );
+}
+
+
+/* =========================================================
+   SAFE FINAL START
+   ========================================================= */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        finalAuraInitialization
+    );
+
+} else {
+
+    finalAuraInitialization();
+}
+
+
+/* =========================================================
+   TOUCH FRIENDLY EXTRA
+   ========================================================= */
+
+document.addEventListener(
+    "pointerdown",
+    event => {
+
+        const target =
+            event.target.closest(
+                ".scratch-block,.sprite-card,.asset-item,.backdrop-card,.project-tab"
+            );
+
+
+        if (!target)
+            return;
+
+
+        /*
+           Prevent accidental double activation
+           on touch screens.
+        */
+
+        target.style.transform =
+            "scale(.97)";
+
+
+        setTimeout(
+            () => {
+
+                target.style.transform =
+                    "";
+
+            },
+            100
+        );
+    }
+);
+
+
+/* =========================================================
+   FINAL SAFETY
+   ========================================================= */
+
+window.addEventListener(
+    "beforeunload",
+    () => {
+
+        saveCurrentSpriteScript();
+
+        localStorage.setItem(
+            "auraPlusMissions",
+            JSON.stringify(
+                completedMissions
+            )
+        );
+    }
+);
+
+
+/* =========================================================
+   AURA PLUS — END
+   ========================================================= */
