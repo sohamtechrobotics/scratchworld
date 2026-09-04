@@ -1730,44 +1730,353 @@ function setupEditorTabs() {
 
 function switchEditorTab(tabName) {
 
+    // Update top tabs
     $$(".editor-tab").forEach(tab => {
-
         tab.classList.toggle(
             "active",
             tab.dataset.tab === tabName
         );
-
     });
 
+    const editorBody = document.querySelector(".scratch-editor-body");
+    if (!editorBody) return;
+
+    const categories = editorBody.querySelector(".block-categories");
+    const palette = editorBody.querySelector(".block-palette");
+    const workspace = editorBody.querySelector(".script-workspace");
+    const rightPanel = editorBody.querySelector(".scratch-right-panel");
+
+    // CODE MODE
     if (tabName === "code") {
 
-        $(".block-categories")?.scrollIntoView({
-            block: "nearest"
-        });
+        editorBody.classList.remove(
+            "costume-mode",
+            "sound-mode"
+        );
 
+        categories?.classList.remove("editor-hidden");
+        palette?.classList.remove("editor-hidden");
+        workspace?.classList.remove("editor-hidden");
+
+        renderAssetEditor(null);
+
+        clearHighlights();
+        return;
     }
 
-    if (
-        tabName === "costumes" ||
-        tabName === "sounds"
-    ) {
+    // COSTUME MODE
+    if (tabName === "costumes") {
 
-        selectedAsset = tabName;
+        editorBody.classList.remove("sound-mode");
+        editorBody.classList.add("costume-mode");
 
-        $$(".asset-tab").forEach(tab => {
+        categories?.classList.add("editor-hidden");
+        palette?.classList.add("editor-hidden");
+        workspace?.classList.add("editor-hidden");
 
-            tab.classList.toggle(
-                "active",
-                tab.dataset.asset === tabName
+        renderAssetEditor("costumes");
+
+        selectedAsset = "costumes";
+        renderAssets("costumes");
+
+        clearHighlights();
+        return;
+    }
+
+   function renderAssetEditor(type) {
+
+    const editorBody =
+        document.querySelector(".scratch-editor-body");
+
+    if (!editorBody) return;
+
+    let panel =
+        document.getElementById("assetEditorWorkspace");
+
+    if (!type) {
+        panel?.remove();
+        return;
+    }
+
+    if (!panel) {
+
+        panel = document.createElement("section");
+
+        panel.id = "assetEditorWorkspace";
+        panel.className = "asset-editor-workspace";
+
+        const rightPanel =
+            editorBody.querySelector(".scratch-right-panel");
+
+        editorBody.insertBefore(panel, rightPanel);
+    }
+
+    const data =
+        spriteAssets[selectedSprite] ||
+        spriteAssets.aura;
+
+    const assets =
+        data[type] || [];
+
+    const title =
+        type === "costumes"
+            ? "Costumes"
+            : "Sounds";
+
+    const icon =
+        type === "costumes"
+            ? "🎭"
+            : "🔊";
+
+    panel.innerHTML = `
+        <div class="asset-editor-top">
+
+            <div>
+                <div class="asset-editor-eyebrow">
+                    SCRATCH 3 • ${title.toUpperCase()}
+                </div>
+
+                <h2>
+                    ${icon} ${title}
+                </h2>
+
+                <p>
+                    ${type === "costumes"
+                        ? "Choose a costume for the selected sprite."
+                        : "Choose a sound for the selected sprite."}
+                </p>
+            </div>
+
+            <div class="asset-editor-sprite">
+                <span class="asset-editor-sprite-icon">
+                    ${getSpriteIcon(selectedSprite)}
+                </span>
+
+                <strong>
+                    ${capitalize(selectedSprite)}
+                </strong>
+
+                <small>
+                    Selected Sprite
+                </small>
+            </div>
+
+        </div>
+
+        <div class="asset-editor-canvas">
+
+            ${
+                type === "costumes"
+                    ? `
+                        <div class="costume-canvas">
+                            <div class="costume-grid"></div>
+
+                            <div
+                                id="costumePreview"
+                                class="big-costume-preview"
+                            >
+                                ${getSpriteIcon(selectedSprite)}
+                            </div>
+
+                            <div class="canvas-label">
+                                COSTUME EDITOR
+                            </div>
+                        </div>
+                    `
+                    : `
+                        <div class="sound-editor">
+
+                            <div class="sound-icon">
+                                🔊
+                            </div>
+
+                            <div class="sound-wave">
+                                ${Array.from(
+                                    {length: 42},
+                                    (_, i) =>
+                                        `<i style="height:${12 + ((i * 17) % 38)}px"></i>`
+                                ).join("")}
+                            </div>
+
+                            <div class="canvas-label">
+                                SOUND EDITOR
+                            </div>
+
+                        </div>
+                    `
+            }
+
+        </div>
+
+        <div class="asset-editor-library">
+
+            <div class="asset-library-heading">
+                <strong>
+                    ${title.toUpperCase()}
+                </strong>
+
+                <span>
+                    ${assets.length} ${type === "costumes"
+                        ? "costumes"
+                        : "sounds"}
+                </span>
+            </div>
+
+            <div
+                id="centralAssetLibrary"
+                class="central-asset-library"
+            >
+                ${assets.map((asset, index) => `
+                    <button
+                        class="central-asset-card ${index === 0 ? "selected" : ""}"
+                        data-central-asset="${asset}"
+                    >
+
+                        <div class="central-asset-thumb">
+                            ${
+                                type === "sounds"
+                                    ? "🔊"
+                                    : getCostumeIcon(
+                                        selectedSprite,
+                                        index
+                                    )
+                            }
+                        </div>
+
+                        <strong>
+                            ${asset}
+                        </strong>
+
+                    </button>
+                `).join("")}
+
+                <button
+                    class="central-add-asset"
+                    id="centralAddAsset"
+                >
+                    +
+                    <span>
+                        Choose a ${type === "costumes"
+                            ? "Costume"
+                            : "Sound"}
+                    </span>
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+    $$(".central-asset-card").forEach(card => {
+
+        card.addEventListener("click", () => {
+
+            $$(".central-asset-card").forEach(c =>
+                c.classList.remove("selected")
             );
 
+            card.classList.add("selected");
+
+            const asset =
+                card.dataset.centralAsset;
+
+            if (type === "costumes") {
+
+                updateStageCostume(asset);
+
+                const preview =
+                    document.getElementById(
+                        "costumePreview"
+                    );
+
+                if (preview) {
+                    preview.textContent =
+                        getCostumeIcon(
+                            selectedSprite,
+                            assets.indexOf(asset)
+                        );
+                }
+
+            } else {
+
+                playSound(asset);
+            }
+
+            if ($("stepStatus")) {
+                $("stepStatus").textContent =
+                    `✓ ${asset} selected.`;
+            }
         });
+    });
 
-        renderAssets();
+    document
+        .getElementById("centralAddAsset")
+        ?.addEventListener("click", () => {
 
+            if ($("stepStatus")) {
+                $("stepStatus").textContent =
+                    `✓ Choose a ${type === "costumes"
+                        ? "costume"
+                        : "sound"} for ${capitalize(selectedSprite)}.`;
+            }
+        });
+}
+
+
+function getSpriteIcon(sprite) {
+
+    const icons = {
+        aura: "A",
+        shadow: "👾",
+        orb: "●",
+        portal: "✦",
+        star: "★"
+    };
+
+    return icons[sprite] || "●";
+}
+
+
+function getCostumeIcon(sprite, index) {
+
+    const icons = {
+        aura: ["A", "✨", "🏃"],
+        shadow: ["👾", "😈"],
+        orb: ["●", "💫"],
+        portal: ["✦", "🌀"],
+        star: ["★"]
+    };
+
+    return (
+        icons[sprite]?.[index] ||
+        getSpriteIcon(sprite)
+    );
+}
+
+
+function capitalize(text) {
+
+    return text.charAt(0).toUpperCase() +
+           text.slice(1);
+}
+   
+    // SOUND MODE
+    if (tabName === "sounds") {
+
+        editorBody.classList.remove("costume-mode");
+        editorBody.classList.add("sound-mode");
+
+        categories?.classList.add("editor-hidden");
+        palette?.classList.add("editor-hidden");
+        workspace?.classList.add("editor-hidden");
+
+        renderAssetEditor("sounds");
+
+        selectedAsset = "sounds";
+        renderAssets("sounds");
+
+        clearHighlights();
     }
-
-    clearHighlights();
 }
 
 
