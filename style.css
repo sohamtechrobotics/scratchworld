@@ -2554,3 +2554,186 @@ select:focus-visible{
 
     color:#fff;
 }
+
+/* =========================================================
+   RIGHT PANEL — FIXED SCRATCH LAYOUT
+   ========================================================= */
+
+.scratch-right-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 10px !important;
+    gap: 8px !important;
+}
+
+
+/* STAGE */
+
+.scratch-stage {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    height: 215px !important;
+    min-height: 215px !important;
+    position: relative !important;
+}
+
+
+/* SPRITE LIST */
+
+.sprite-list {
+    flex: 0 0 auto !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    max-height: none !important;
+}
+
+
+/* COSTUMES / SOUNDS */
+
+.asset-section {
+    flex: 0 0 auto !important;
+    display: block !important;
+    width: 100% !important;
+    min-height: 105px !important;
+    margin-top: 2px !important;
+}
+
+
+/* TABS */
+
+.asset-tabs {
+    display: flex !important;
+    width: 100% !important;
+    height: 30px !important;
+    border-bottom: 1px solid #dbe3ef !important;
+}
+
+
+.asset-tab {
+    flex: 1 !important;
+    border: 0 !important;
+    background: transparent !important;
+    font-size: 8px !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+}
+
+
+/* LIBRARY — IMPORTANT */
+
+#assetLibrary {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+
+    width: 100% !important;
+    min-height: 58px !important;
+    max-height: 70px !important;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+
+    padding: 7px 2px !important;
+}
+
+
+/* COSTUME CARDS */
+
+.asset-item {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    height: 48px !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    border: 1px solid #d8e0ec !important;
+    border-radius: 7px !important;
+
+    background: #ffffff !important;
+    cursor: pointer !important;
+}
+
+
+/* SELECTED COSTUME */
+
+.asset-item.selected {
+    border: 2px solid #4c97ff !important;
+    box-shadow: 0 0 0 2px rgba(76,151,255,.12) !important;
+}
+
+
+/* CHOOSE COSTUME */
+
+#chooseCostumeButton {
+    flex: 0 0 auto !important;
+    height: 24px !important;
+    padding: 3px 6px !important;
+}
+
+
+/* BACKDROPS */
+
+.backdrop-section {
+    flex: 0 0 auto !important;
+    margin-top: 2px !important;
+}
+
+
+.backdrop-library {
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    padding-bottom: 4px !important;
+}
+
+
+.backdrop-card {
+    flex: 0 0 62px !important;
+}
+
+
+/* PANEL HEADERS */
+
+.panel-section-header {
+    flex: 0 0 auto !important;
+    margin-top: 2px !important;
+}
+
+
+/* KEEP EVERYTHING INSIDE RIGHT PANEL */
+
+.scratch-right-panel > * {
+    flex-shrink: 0 !important;
+}
+
+
+/* =========================================================
+   DESKTOP HEIGHT OPTIMISATION
+   ========================================================= */
+
+@media (min-width: 1000px) {
+
+    .scratch-stage {
+        height: 190px !important;
+        min-height: 190px !important;
+    }
+
+    .asset-section {
+        min-height: 105px !important;
+    }
+
+    #assetLibrary {
+        min-height: 55px !important;
+        max-height: 60px !important;
+    }
+
+    .backdrop-section {
+        margin-bottom: 10px !important;
+    }
+}
